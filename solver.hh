@@ -233,16 +233,16 @@ public:
 				continue;
 
 			if (defined(c[wi[0]])) {
-				watchlists[c[wi[0]]].remove(c);
+				watchlists[~c[wi[0]]].remove(c);
 				watches[c.index()][0] = i;
-				watchlists[l].insert(c);
+				watchlists[~l].insert(c);
 				return true;
 			}
 
 			if (defined(c[wi[1]])) {
-				watchlists[c[wi[1]]].remove(c);
+				watchlists[~c[wi[1]]].remove(c);
 				watches[c.index()][1] = i;
-				watchlists[l].insert(c);
+				watchlists[~l].insert(c);
 				return true;
 			}
 		}
