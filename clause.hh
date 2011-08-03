@@ -132,10 +132,9 @@ public:
 
 		std::ostringstream ss;
 
-		if (data->size > 0)
-			ss << data->literals[0].string();
+		ss << "[" << data->index << "]";
 
-		for (unsigned int i = 1; i < data->size; ++i)
+		for (unsigned int i = 0; i < data->size; ++i)
 			ss << " " << data->literals[i].string();
 
 		return ss.str();
