@@ -103,33 +103,39 @@ public:
 
 	void assign(unsigned int variable, bool value)
 	{
-		debug("variable = %u, value = %u", variable, value);
+		debug_enter("variable = %u, value = %u", variable, value);
 
 		assert_hotpath(variable < nr_variables);
 		assert_hotpath(!defined(variable));
 		valuation[2 * variable + 0] = true;
 		valuation[2 * variable + 1] = value;
+
+		debug_leave;
 	}
 
 	void assign(literal l, bool value)
 	{
-		debug("literal = %s, value = %u", l.string().c_str(), value);
+		debug_enter("literal = %s, value = %u", l.string().c_str(), value);
 
 		assign(l.variable(), l.value() == value);
+
+		debug_leave;
 	}
 
 	void unassign(unsigned int variable)
 	{
-		debug("variable = %u", variable);
+		debug_enter("variable = %u", variable);
 
 		assert_hotpath(variable < nr_variables);
 		assert_hotpath(defined(variable));
 		valuation[2 * variable + 0] = false;
+
+		debug_leave;
 	}
 
 	void attach(clause c)
 	{
-		debug("clause = %s", c.string().c_str());
+		debug_enter("clause = %s", c.string().c_str());
 
 		assert_hotpath(c.size() >= 2);
 
@@ -157,20 +163,24 @@ public:
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
 		watches[c.index()] = w;
+
+		debug_leave;
 	}
 
 	void detach(clause c)
 	{
-		debug("clause = %s", c.string().c_str());
+		debug_enter("clause = %s", c.string().c_str());
 
 		watch_indices w = watches[c.index()];
 		watchlists[~c[w[0]]].remove(c);
 		watchlists[~c[w[1]]].remove(c);
+
+		debug_leave;
 	}
 
 	void decision(literal lit)
 	{
-		debug("literal = %s", lit.string().c_str());
+		debug_enter("literal = %s", lit.string().c_str());
 
 		assert_hotpath(!defined(lit));
 
@@ -179,6 +189,8 @@ public:
 		trail[trail_index] = lit.variable();
 		decisions[decision_index++] = trail_index++;
 		queue.push(lit);
+
+		debug_leave;
 	}
 
 	/* Called whenever a variable is forced to a particular value. The
@@ -186,22 +198,22 @@ public:
 	 * and this function will return false. */
 	bool implication(literal lit)
 	{
-		debug("literal = %s", lit.string().c_str());
+		debug_enter("literal = %s", lit.string().c_str());
 
 		if (defined(lit))
-			return value(lit);
+			return debug_return(value(lit), "value(lit)");
 
 		/* XXX: Record when this variable was set? */
 		assign(lit, true);
 		trail[trail_index++] = lit.variable();
 		queue.push(lit);
-		return true;
+		return debug_return(true, "true");
 	}
 
 	/* Return false if and only if there was a conflict. */
 	bool find_new_watch(clause c)
 	{
-		debug("clause = %s", c.string().c_str());
+		debug_enter("clause = %s", c.string().c_str());
 
 		/* At this point we know that the watchlists may not be
 		 * entirely in sync with the current assignments, because
@@ -220,7 +232,7 @@ public:
 					/* Literal was already satisfied;
 					 * clause is satisfied; we don't
 					 * need to do _anything_ else here */
-					return true;
+					return debug_return(true, "true /* clause is satisfied */");
 				}
 
 				/* Literal was falsified; we cannot
@@ -236,14 +248,14 @@ public:
 				watchlists[~c[wi[0]]].remove(c);
 				watches[c.index()][0] = i;
 				watchlists[~l].insert(c);
-				return true;
+				return debug_return(true, "true /* found new watch 1 */");
 			}
 
 			if (defined(c[wi[1]])) {
 				watchlists[~c[wi[1]]].remove(c);
 				watches[c.index()][1] = i;
 				watchlists[~l].insert(c);
-				return true;
+				return debug_return(true, "true /* found new watch 2 */");
 			}
 		}
 
@@ -251,18 +263,18 @@ public:
 		 * no way of satisfying the clause, or we can propagate on
 		 * the other watched literal. */
 		if (!defined(c[wi[0]]))
-			return implication(c[wi[0]]);
+			return debug_return(implication(c[wi[0]]), "<same>");
 		if (!defined(c[wi[1]]))
-			return implication(c[wi[1]]);
+			return debug_return(implication(c[wi[1]]), "<same>");
 
 		/* There was a conflict. */
-		return false;
+		return debug_return(false, "false");
 	}
 
 	/* Return false if and only if there was a conflict. */
 	bool propagate(literal lit)
 	{
-		debug("literal = %s", lit.string().c_str());
+		debug_enter("literal = %s", lit.string().c_str());
 
 		/* Every variable that we are propagating should
 		 * already be defined with the correct polarity. */
@@ -277,17 +289,23 @@ public:
 		debug("watchlist size = %u", n);
 
 		for (unsigned int i = 0; i < n; ++i) {
-			if (!find_new_watch(w[i]))
-				return false;
+			clause c = w[i];
+			watch_indices wi = watches[c.index()];
+
+			/* This literal is exactly one of the watched literals */
+			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));
+
+			if (!find_new_watch(c))
+				return debug_return(false, "false");
 		}
 
-		return true;
+		return debug_return(true, "true");
 	}
 
 	/* Return false if and only if there was a conflict. */
 	bool propagate()
 	{
-		debug("");
+		debug_enter("");
 
 		while (!queue.empty()) {
 			literal lit = queue.front();
@@ -296,15 +314,15 @@ public:
 			/* If propagation caused a conflict, abort the rest
 			 * of the conflicts as well. */
 			if (!propagate(lit))
-				return false;
+				return debug_return(false, "false");
 		}
 
-		return true;
+		return debug_return(true, "true");
 	}
 
 	void backtrack(unsigned int decision)
 	{
-		debug("decision = %u", decision);
+		debug_enter("decision = %u", decision);
 
 		assert(decision < decision_index);
 
@@ -321,6 +339,8 @@ public:
 
 		/* Clear queue (XXX: Use trail for this) */
 		queue = std::queue<literal>();
+
+		debug_leave;
 	}
 };
 
