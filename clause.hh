@@ -52,6 +52,11 @@ public:
 
 	impl *data;
 
+	clause():
+		data(0)
+	{
+	}
+
 	clause(unsigned int index, const std::vector<literal> &v)
 	{
 		unsigned int size = v.size();

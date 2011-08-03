@@ -56,6 +56,10 @@ public:
 	/* XXX: Use trail for this */
 	std::queue<literal> queue;
 
+	/* Indexed by variable. Gives the reason why a variable was set
+	 * if the variable was implied. */
+	clause *reasons;
+
 	solver(unsigned int nr_variables, const std::vector<clause> &clauses):
 		nr_variables(nr_variables),
 		valuation(2 * nr_variables),
@@ -64,7 +68,8 @@ public:
 		trail(new unsigned int[nr_variables]),
 		trail_index(0),
 		decisions(new unsigned int[nr_variables]),
-		decision_index(0)
+		decision_index(0),
+		reasons(new clause[nr_variables])
 	{
 		/* Attach all clauses in the original instance */
 		for (unsigned int i = 0; i < clauses.size(); ++i)
@@ -184,10 +189,11 @@ public:
 
 		assert_hotpath(!defined(lit));
 
-		/* XXX: Record when this variable was set? */
+		unsigned int variable = lit.variable();
 		assign(lit, true);
 		trail[trail_index] = lit.variable();
 		decisions[decision_index++] = trail_index++;
+		reasons[variable] = clause();
 		queue.push(lit);
 
 		debug_leave;
@@ -196,16 +202,17 @@ public:
 	/* Called whenever a variable is forced to a particular value. The
 	 * variable may be defined already, in which case we have a conflict
 	 * and this function will return false. */
-	bool implication(literal lit)
+	bool implication(literal lit, clause reason)
 	{
 		debug_enter("literal = %s", lit.string().c_str());
 
 		if (defined(lit))
 			return debug_return(value(lit), "value(lit)");
 
-		/* XXX: Record when this variable was set? */
+		unsigned int variable = lit.variable();
 		assign(lit, true);
-		trail[trail_index++] = lit.variable();
+		trail[trail_index++] = variable;
+		reasons[variable] = reason;
 		queue.push(lit);
 		return debug_return(true, "true");
 	}
@@ -263,9 +270,9 @@ public:
 		 * no way of satisfying the clause, or we can propagate on
 		 * the other watched literal. */
 		if (!defined(c[wi[0]]))
-			return debug_return(implication(c[wi[0]]), "<same>");
+			return debug_return(implication(c[wi[0]], c), "<same>");
 		if (!defined(c[wi[1]]))
-			return debug_return(implication(c[wi[1]]), "<same>");
+			return debug_return(implication(c[wi[1]], c), "<same>");
 
 		/* There was a conflict. */
 		return debug_return(false, "false");
