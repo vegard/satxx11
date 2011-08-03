@@ -261,6 +261,14 @@ public:
 
 int main(int argc, char *argv[])
 {
+#if CONFIG_DEBUG == 1
+	/* Don't buffer stdout/stderr. This REALLY helps for debugging
+	 * as it also makes sure that messages from the solver and e.g.
+	 * valgrind appear in the right order. */
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+#endif
+
 	unsigned int nr_threads = 1;
 	std::vector<std::string> input_files;
 
