@@ -41,7 +41,19 @@ public:
 		uatomic_set(&data, value);
 	}
 
-	operator bool() const
+	/* Prefix increment */
+	t operator++()
+	{
+		return uatomic_add_return(&data, 1);
+	}
+
+	/* Postfix increment */
+	t operator++(int)
+	{
+		return uatomic_add_return(&data, 1) - 1;
+	}
+
+	operator t() const
 	{
 		return uatomic_read(&data);
 	}
