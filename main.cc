@@ -109,6 +109,7 @@ void read_cnf(std::istream &file,
 
 
 static atomic<bool> should_exit;
+static atomic<unsigned int> clause_counter;
 
 static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 {
@@ -235,10 +236,18 @@ public:
 				if (nr_conflicts % 10000 == 0)
 					printf("c %u conflicts\n", nr_conflicts);
 
-				/* XXX: Analyse conflict */
+				/* XXX: Analyse conflict properly */
+				std::vector<literal> conflict_clause;
+				for (unsigned int i = 0; i < s.trail_index; ++i)
+					conflict_clause.push_back(literal(s.trail[i], !s.value(s.trail[i])));
 
 				/* XXX: Don't backtrack all the way back */
 				s.backtrack(rand() % s.decision_index);
+
+				unsigned int clauses = ++clause_counter;
+				while (s.watches.size() < clauses)
+					s.watches.push_back(watch_indices());
+				s.attach(clause(clauses - 1, conflict_clause));
 			}
 
 			/* Let writers know that we're done with old copies
@@ -328,6 +337,8 @@ int main(int argc, char *argv[])
 		printf("c Reading standard input\n");
 		read_cnf(std::cin, variables, reverse_variables, clauses);
 	}
+
+	clause_counter = clauses.size();
 
 	/* Catch Ctrl-C and stop the threads gracefully (NOTE: Do this after
 	 * reading the instance, to allow the default handler to abort the
