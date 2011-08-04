@@ -131,6 +131,11 @@ public:
 		return data->literals[i];
 	}
 
+	operator bool() const
+	{
+		return data;
+	}
+
 	std::string string() const
 	{
 		assert_hotpath(data);
