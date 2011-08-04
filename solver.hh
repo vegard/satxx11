@@ -60,6 +60,9 @@ public:
 	 * if the variable was implied. */
 	clause *reasons;
 
+	literal conflict_literal;
+	clause conflict_reason;
+
 	solver(unsigned int nr_variables, const std::vector<clause> &clauses):
 		nr_variables(nr_variables),
 		valuation(2 * nr_variables),
@@ -212,6 +215,8 @@ public:
 			if (value(lit))
 				return debug_return(true, "true /* no conflict; already defined */");
 
+			conflict_literal = lit;
+			conflict_reason = reason;
 			return debug_return(false, "false /* conflict */");
 		}
 
