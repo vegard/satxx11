@@ -206,19 +206,25 @@ public:
 	{
 		debug_enter("literal = %s", lit.string().c_str());
 
-		if (defined(lit))
-			return debug_return(value(lit), "value(lit)");
+		if (defined(lit)) {
+			/* If it's already defined to have the right value,
+			 * we don't have a conflict. */
+			if (value(lit))
+				return debug_return(true, "true /* no conflict; already defined */");
+
+			return debug_return(false, "false /* conflict */");
+		}
 
 		unsigned int variable = lit.variable();
 		assign(lit, true);
 		trail[trail_index++] = variable;
 		reasons[variable] = reason;
 		queue.push(lit);
-		return debug_return(true, "true");
+		return debug_return(true, "true /* no conflict */");
 	}
 
 	/* Return false if and only if there was a conflict. */
-	bool find_new_watch(clause c)
+	bool find_new_watch(clause c, unsigned int watch)
 	{
 		debug_enter("clause = %s", c.string().c_str());
 
@@ -248,34 +254,20 @@ public:
 			}
 
 			/* Don't select the other (existing) watch */
-			if (i == wi[0] || i == wi[1])
+			if (i == wi[!watch])
 				continue;
 
-			if (defined(c[wi[0]])) {
-				watchlists[~c[wi[0]]].remove(c);
-				watches[c.index()][0] = i;
-				watchlists[~l].insert(c);
-				return debug_return(true, "true /* found new watch 1 */");
-			}
-
-			if (defined(c[wi[1]])) {
-				watchlists[~c[wi[1]]].remove(c);
-				watches[c.index()][1] = i;
-				watchlists[~l].insert(c);
-				return debug_return(true, "true /* found new watch 2 */");
-			}
+			/* Replace the old watch with the new one */
+			watchlists[~c[wi[watch]]].remove(c);
+			watches[c.index()][watch] = i;
+			watchlists[~l].insert(c);
+			return debug_return(true, "true /* found new watch */");
 		}
 
-		/* No new watch was found. This means that we either have
-		 * no way of satisfying the clause, or we can propagate on
-		 * the other watched literal. */
-		if (!defined(c[wi[0]]))
-			return debug_return(implication(c[wi[0]], c), "<same>");
-		if (!defined(c[wi[1]]))
-			return debug_return(implication(c[wi[1]], c), "<same>");
-
-		/* There was a conflict. */
-		return debug_return(false, "false");
+		/* There was no other watch to replace the one we just
+		 * falsified; therefore, the other watched literal must
+		 * be satisfied (this is the implication). */
+		return debug_return(implication(c[wi[!watch]], c), "<same>");
 	}
 
 	/* Return false if and only if there was a conflict. */
@@ -302,7 +294,7 @@ public:
 			/* This literal is exactly one of the watched literals */
 			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));
 
-			if (!find_new_watch(c))
+			if (!find_new_watch(c, c[wi[1]] == ~lit))
 				return debug_return(false, "false");
 		}
 
