@@ -28,6 +28,8 @@
 extern "C" {
 #include <signal.h>
 #include <stdint.h>
+
+#include <sys/sysinfo.h>
 }
 
 extern "C" {
@@ -323,6 +325,14 @@ int main(int argc, char *argv[])
 #endif
 
 	unsigned int nr_threads = 1;
+
+	/* Get the number of "enabled CPUs" from the kernel */
+	{
+		int nprocs = get_nprocs();
+		if (nprocs >= 1)
+			nr_threads = nprocs;
+	}
+
 	std::vector<std::string> input_files;
 
 	/* Process command line */
