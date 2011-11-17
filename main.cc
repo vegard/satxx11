@@ -113,6 +113,10 @@ static atomic<unsigned int> clause_counter;
 
 static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 {
+	/* Second signal should kill us no matter what. */
+	if (should_exit)
+		abort();
+
 	should_exit = true;
 }
 
