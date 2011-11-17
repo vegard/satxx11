@@ -221,37 +221,81 @@ public:
 
 			/* Find unassigned literal (XXX: Use heuristic) */
 			unsigned int variable;
-#if 0
-			/* Pick variables in increasing order */
-			for (variable = 0; variable < nr_variables; ++variable) {
-				if (!s.defined(variable))
-					break;
-			}
-#else
+
 			/* Pick a variable at random */
 			do {
 				variable = rand() % nr_variables;
 			} while (s.defined(variable));
-#endif
 
 			s.decision(literal(variable, rand() % 2));
 			if (!s.propagate()) {
-				++nr_conflicts;
-				if (nr_conflicts % 10000 == 0)
-					printf("c %u conflicts\n", nr_conflicts);
+				/* Conflict analysis */
+				std::vector<bool> seen(s.nr_variables, false);
 
-				/* XXX: Analyse conflict properly */
+				unsigned int trail_index = s.trail_index;
+
+				unsigned int counter = 0;
 				std::vector<literal> conflict_clause;
-				for (unsigned int i = 0; i < s.trail_index; ++i)
-					conflict_clause.push_back(literal(s.trail[i], !s.value(s.trail[i])));
+				unsigned int new_decision_index = 0;
 
-				/* XXX: Don't backtrack all the way back */
-				s.backtrack(rand() % s.decision_index);
+				unsigned int variable;
+				clause reason = s.conflict_reason;
 
-				unsigned int clauses = ++clause_counter;
-				while (s.watches.size() < clauses)
-					s.watches.push_back(watch_indices());
-				s.attach(clause(clauses - 1, conflict_clause));
+				do {
+					assert(reason);
+					debug("reason = %s", reason.string().c_str());
+
+					for (unsigned int i = 0; i < reason.size(); ++i) {
+						literal lit = reason[i];
+						unsigned int variable = lit.variable();
+
+						if (!seen[variable]) {
+							seen[variable] = true;
+
+							if (s.levels[variable] == s.decision_index) {
+								++counter;
+							} else {
+								/* XXX: Exclude variables from decision level 0 */
+								conflict_clause.push_back(lit);
+								if (s.levels[variable] > new_decision_index)
+									new_decision_index = s.levels[variable];
+							}
+						}
+					}
+
+					do {
+						variable = s.trail[--trail_index];
+					} while (!seen[variable]);
+
+					reason = s.reasons[variable];
+
+					--counter;
+				} while (counter > 0);
+
+				literal asserting_literal = ~literal(variable, s.value(variable));
+				conflict_clause.push_back(asserting_literal);
+
+				/* XXX: Deal with unit facts (1 literal) */
+				s.watches.push_back(watch_indices());
+				clause learnt_clause(clause_counter++, conflict_clause);
+
+				debug("learnt = %s", learnt_clause.string().c_str());
+
+				/* XXX: According to "A case for simple SAT solvers", we
+				 * should backtrack to the "next highest decision level" of
+				 * the learnt clause's literals. */
+				s.backtrack(new_decision_index);
+
+#if 0
+				/* Automatically force the opposite polarity for the last
+				 * variable (after backtracking its consequences). */
+				s.decision(asserting_literal);
+
+				/* Attach the newly learnt clause. It will be satisfied by
+				 * the decision above. */
+				if (learnt_clause.size() >= 2)
+					s.attach(learnt_clause);
+#endif
 			}
 
 			/* Let writers know that we're done with old copies
