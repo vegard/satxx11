@@ -151,6 +151,19 @@ public:
 	{
 	}
 
+	literal next_decision_literal(solver &s)
+	{
+		/* Find unassigned literal (XXX: Use heuristic) */
+		unsigned int variable;
+
+		/* Pick a variable at random */
+		do {
+			variable = rand() % nr_variables;
+		} while (s.defined(variable));
+
+		return literal(variable, rand() % 2);
+	}
+
 	void run()
 	{
 		static unsigned int nr_conflicts = 0;
@@ -219,15 +232,7 @@ public:
 				break;
 			}
 
-			/* Find unassigned literal (XXX: Use heuristic) */
-			unsigned int variable;
-
-			/* Pick a variable at random */
-			do {
-				variable = rand() % nr_variables;
-			} while (s.defined(variable));
-
-			s.decision(literal(variable, rand() % 2));
+			s.decision(next_decision_literal(s));
 			if (!s.propagate()) {
 				/* Conflict analysis */
 				std::vector<bool> seen(s.nr_variables, false);
