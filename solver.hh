@@ -60,6 +60,10 @@ public:
 	 * if the variable was implied. */
 	clause *reasons;
 
+	/* Decision level at which the variable was set. */
+	/* XXX: Use uint32_t? */
+	unsigned int *levels;
+
 	literal conflict_literal;
 	clause conflict_reason;
 
@@ -72,7 +76,8 @@ public:
 		trail_index(0),
 		decisions(new unsigned int[nr_variables]),
 		decision_index(0),
-		reasons(new clause[nr_variables])
+		reasons(new clause[nr_variables]),
+		levels(new unsigned int[nr_variables])
 	{
 		/* Attach all clauses in the original instance */
 		for (unsigned int i = 0; i < clauses.size(); ++i)
@@ -206,9 +211,12 @@ public:
 
 		unsigned int variable = lit.variable();
 		assign(lit, true);
-		trail[trail_index] = lit.variable();
-		decisions[decision_index++] = trail_index++;
+		trail[trail_index] = variable;
+		decisions[decision_index] = trail_index;
+		++trail_index;
 		reasons[variable] = clause();
+		++decision_index;
+		levels[variable] = decision_index;
 		queue.push(lit);
 
 		debug_leave;
@@ -234,8 +242,10 @@ public:
 
 		unsigned int variable = lit.variable();
 		assign(lit, true);
-		trail[trail_index++] = variable;
+		trail[trail_index] = variable;
+		++trail_index;
 		reasons[variable] = reason;
+		levels[variable] = decision_index;
 		queue.push(lit);
 		return debug_return(true, "true /* no conflict */");
 	}
