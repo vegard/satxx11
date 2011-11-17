@@ -150,15 +150,23 @@ public:
 		/* Pick watches among the unassigned literals. */
 		watch_indices w;
 
+		/* We can select undefined and true literals (if we select an
+		 * undefined one, we may visit it during propagation when it
+		 * becomes defined; if we select a satisfied literal, nothing
+		 * will happen with the watch until we backtrack and the
+		 * literal becomes undefined). Of course, we're better off
+		 * here if we always select true literals that were defined
+		 * early in the decision stack, etc. since this makes it less
+		 * likely that we will follow a "stale" watch. */
 		unsigned int size = c.size();
 		for (unsigned int i = 0; i < size; ++i) {
-			if (defined(c[i]))
+			if (defined(c[i]) && !value(c[i]))
 				continue;
 
 			w[0] = i;
 
 			for (unsigned int j = i + 1; j < size; ++j) {
-				if (defined(c[j]))
+				if (defined(c[j]) && !value(c[j]))
 					continue;
 
 				w[1] = j;
@@ -167,6 +175,10 @@ public:
 
 			break;
 		}
+
+		assert_hotpath(w[0] != w[1]);
+		assert_hotpath(!defined(c[w[0]]) || value(c[w[0]]));
+		assert_hotpath(!defined(c[w[1]]) || value(c[w[1]]));
 
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
