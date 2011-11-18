@@ -151,4 +151,9 @@ public:
 	}
 };
 
+std::ostream &operator<<(std::ostream &os, const clause &c)
+{
+	return os << c.string();
+}
+
 #endif

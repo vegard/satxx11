@@ -126,7 +126,7 @@ public:
 
 	void assign(literal l, bool value)
 	{
-		debug_enter("literal = $, value = $", l.string().c_str(), value);
+		debug_enter("literal = $, value = $", l, value);
 
 		assign(l.variable(), l.value() == value);
 	}
@@ -142,7 +142,7 @@ public:
 
 	void attach(clause c, watch_indices w)
 	{
-		debug_enter("clause = $", c.string().c_str());
+		debug_enter("clause = $", c);
 
 		assert_hotpath(c.size() >= 2);
 
@@ -157,7 +157,7 @@ public:
 
 	void attach(clause c)
 	{
-		debug_enter("clause = $", c.string().c_str());
+		debug_enter("clause = $", c);
 
 		assert_hotpath(c.size() >= 2);
 
@@ -200,7 +200,7 @@ public:
 
 	void detach(clause c)
 	{
-		debug_enter("clause = $", c.string().c_str());
+		debug_enter("clause = $", c);
 
 		watch_indices w = watches[c.index()];
 		watchlists[~c[w[0]]].remove(c);
@@ -209,7 +209,7 @@ public:
 
 	void decision(literal lit)
 	{
-		debug_enter("literal = $", lit.string().c_str());
+		debug_enter("literal = $", lit);
 
 		assert_hotpath(!defined(lit));
 
@@ -229,7 +229,7 @@ public:
 	 * and this function will return false. */
 	bool implication(literal lit, clause reason)
 	{
-		debug_enter("literal = $", lit.string().c_str());
+		debug_enter("literal = $", lit);
 
 		if (defined(lit)) {
 			/* If it's already defined to have the right value,
@@ -255,7 +255,7 @@ public:
 	/* Return false if and only if there was a conflict. */
 	bool find_new_watch(clause c, unsigned int watch)
 	{
-		debug_enter("clause = $", c.string().c_str());
+		debug_enter("clause = $", c);
 
 		/* At this point we know that the watchlists may not be
 		 * entirely in sync with the current assignments, because
@@ -302,7 +302,7 @@ public:
 	/* Return false if and only if there was a conflict. */
 	bool propagate(literal lit)
 	{
-		debug_enter("literal = $", lit.string().c_str());
+		debug_enter("literal = $", lit);
 
 		/* Every variable that we are propagating should
 		 * already be defined with the correct polarity. */
