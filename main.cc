@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <fstream>
@@ -39,7 +40,6 @@ extern "C" {
 #undef min
 }
 
-#include "atomic.hh"
 #include "clause.hh"
 #include "debug.hh"
 #include "literal.hh"
@@ -110,8 +110,10 @@ void read_cnf(std::istream &file,
 }
 
 
-static atomic<bool> should_exit;
-static atomic<unsigned int> clause_counter;
+/* XXX: Go through their use points and add/remove the necessary memory
+ * barriers */
+static std::atomic<bool> should_exit;
+static std::atomic<unsigned int> clause_counter;
 
 static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 {
