@@ -124,6 +124,87 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 	should_exit = true;
 }
 
+class analyze_1uip {
+public:
+	analyze_1uip(solver &s)
+	{
+	}
+
+	void operator()(solver &s)
+	{
+		std::vector<bool> seen(s.nr_variables, false);
+
+		unsigned int trail_index = s.trail_index;
+
+		unsigned int counter = 0;
+		std::vector<literal> conflict_clause;
+		unsigned int new_decision_index = 0;
+
+		unsigned int variable;
+		clause reason = s.conflict_reason;
+
+		do {
+			assert(reason);
+			debug("reason = $", reason);
+
+			for (unsigned int i = 0; i < reason.size(); ++i) {
+				literal lit = reason[i];
+				unsigned int variable = lit.variable();
+
+				if (!seen[variable]) {
+					seen[variable] = true;
+
+					if (s.levels[variable] == s.decision_index) {
+						++counter;
+					} else {
+						/* XXX: Exclude variables from decision level 0 */
+						conflict_clause.push_back(lit);
+						if (s.levels[variable] > new_decision_index)
+							new_decision_index = s.levels[variable];
+					}
+				}
+			}
+
+			do {
+				variable = s.trail[--trail_index];
+			} while (!seen[variable]);
+
+			reason = s.reasons[variable];
+
+			--counter;
+		} while (counter > 0);
+
+		literal asserting_literal = ~literal(variable, s.value(variable));
+		conflict_clause.push_back(asserting_literal);
+
+		/* XXX: Deal with unit facts (1 literal) */
+		unsigned int clause_id = clause_counter++;
+		clause learnt_clause(clause_id, conflict_clause);
+
+		while (s.watches.size() <= clause_id)
+			s.watches.push_back(watch_indices());
+
+		debug("learnt = $", learnt_clause);
+
+		/* XXX: According to "A case for simple SAT solvers", we
+		 * should backtrack to the "next highest decision level" of
+		 * the learnt clause's literals. */
+		s.backtrack(new_decision_index);
+
+		/* Automatically force the opposite polarity for the last
+		 * variable (after backtracking its consequences). */
+		s.decision(asserting_literal);
+
+		/* Attach the newly learnt clause. It will be satisfied by
+		 * the decision above. */
+		if (learnt_clause.size() >= 2) {
+			s.attach(learnt_clause,
+				watch_indices(learnt_clause.size() - 1, learnt_clause.size() - 2));
+		}
+	}
+};
+
+template<class Analyze = analyze_1uip>
 class solver_thread:
 	public thread
 {
@@ -168,6 +249,50 @@ public:
 		return literal(variable, rand() % 2);
 	}
 
+	void verify(solver &s)
+	{
+		/* Verify that the solution is indeed a solution */
+		for (unsigned int i = 0; i < clauses.size(); ++i) {
+			clause c = clauses[i];
+
+			bool v = false;
+			for (unsigned int j = 0; j < c.size(); ++j) {
+				assert(s.defined(c[j]));
+				v = v || s.value(c[j]);
+			}
+
+			assert(v);
+		}
+
+		std::ostringstream ss;
+
+		variable_map::const_iterator it = variables.begin();
+		variable_map::const_iterator end = variables.end();
+
+		if (it != end) {
+			assert(s.defined(it->second));
+
+			if (!s.value(it->second))
+				ss << "-";
+
+			ss << it->first;
+		}
+
+		while (++it != end) {
+			assert(s.defined(it->second));
+
+			ss << " ";
+
+			if (!s.value(it->second))
+				ss << "-";
+
+			ss << it->first;
+		}
+
+		printf("v %s\n", ss.str().c_str());
+		printf("c SATISFIABLE\n");
+	}
+
 	void run()
 	{
 		static unsigned int nr_conflicts = 0;
@@ -181,6 +306,7 @@ public:
 		 * used on. I'm not sure if these are really worth optimising
 		 * for, though. */
 		solver s(nr_variables, clauses);
+		Analyze analyze(s);
 
 		while (!should_exit) {
 			/* XXX: Receive learnt clauses from other threads */
@@ -192,123 +318,12 @@ public:
 			 * current assignment satisfies the instance. */
 			if (s.trail_index == nr_variables) {
 				should_exit = true;
-
-				/* Verify that the solution is indeed a solution */
-				for (unsigned int i = 0; i < clauses.size(); ++i) {
-					clause c = clauses[i];
-
-					bool v = false;
-					for (unsigned int j = 0; j < c.size(); ++j) {
-						assert(s.defined(c[j]));
-						v = v || s.value(c[j]);
-					}
-
-					assert(v);
-				}
-
-				std::ostringstream ss;
-
-				variable_map::const_iterator it = variables.begin();
-				variable_map::const_iterator end = variables.end();
-
-				if (it != end) {
-					assert(s.defined(it->second));
-
-					if (!s.value(it->second))
-						ss << "-";
-
-					ss << it->first;
-				}
-
-				while (++it != end) {
-					assert(s.defined(it->second));
-
-					ss << " ";
-
-					if (!s.value(it->second))
-						ss << "-";
-
-					ss << it->first;
-				}
-
-				printf("v %s\n", ss.str().c_str());
-				printf("c SATISFIABLE\n");
-				break;
+				verify(s);
 			}
 
 			s.decision(next_decision_literal(s));
-			while (!s.propagate() && !should_exit) {
-				/* Conflict analysis */
-				std::vector<bool> seen(s.nr_variables, false);
-
-				unsigned int trail_index = s.trail_index;
-
-				unsigned int counter = 0;
-				std::vector<literal> conflict_clause;
-				unsigned int new_decision_index = 0;
-
-				unsigned int variable;
-				clause reason = s.conflict_reason;
-
-				do {
-					assert(reason);
-					debug("reason = $", reason);
-
-					for (unsigned int i = 0; i < reason.size(); ++i) {
-						literal lit = reason[i];
-						unsigned int variable = lit.variable();
-
-						if (!seen[variable]) {
-							seen[variable] = true;
-
-							if (s.levels[variable] == s.decision_index) {
-								++counter;
-							} else {
-								/* XXX: Exclude variables from decision level 0 */
-								conflict_clause.push_back(lit);
-								if (s.levels[variable] > new_decision_index)
-									new_decision_index = s.levels[variable];
-							}
-						}
-					}
-
-					do {
-						variable = s.trail[--trail_index];
-					} while (!seen[variable]);
-
-					reason = s.reasons[variable];
-
-					--counter;
-				} while (counter > 0);
-
-				literal asserting_literal = ~literal(variable, s.value(variable));
-				conflict_clause.push_back(asserting_literal);
-
-				/* XXX: Deal with unit facts (1 literal) */
-				unsigned int clause_id = clause_counter++;
-				clause learnt_clause(clause_id, conflict_clause);
-
-				while (s.watches.size() <= clause_id)
-					s.watches.push_back(watch_indices());
-
-				debug("learnt = $", learnt_clause);
-
-				/* XXX: According to "A case for simple SAT solvers", we
-				 * should backtrack to the "next highest decision level" of
-				 * the learnt clause's literals. */
-				s.backtrack(new_decision_index);
-
-				/* Automatically force the opposite polarity for the last
-				 * variable (after backtracking its consequences). */
-				s.decision(asserting_literal);
-
-				/* Attach the newly learnt clause. It will be satisfied by
-				 * the decision above. */
-				if (learnt_clause.size() >= 2) {
-					s.attach(learnt_clause,
-						watch_indices(learnt_clause.size() - 1, learnt_clause.size() - 2));
-				}
-			}
+			while (!s.propagate() && !should_exit)
+				analyze(s);
 
 			/* Let writers know that we're done with old copies
 			 * of RCU-protected data. */
@@ -385,7 +400,7 @@ int main(int argc, char *argv[])
 			printf("c sizeof(clause::impl) = %lu\n", sizeof(clause::impl));
 			printf("c sizeof(literal) = %lu\n", sizeof(literal));
 			printf("c sizeof(solver) = %lu\n", sizeof(solver));
-			printf("c sizeof(solver_thread) = %lu\n", sizeof(solver_thread));
+			printf("c sizeof(solver_thread) = %lu\n", sizeof(solver_thread<>));
 			printf("c sizeof(watch_indices) = %lu\n", sizeof(watch_indices));
 			printf("c sizeof(watchlist) = %lu\n", sizeof(watchlist));
 			return 0;
@@ -428,9 +443,9 @@ int main(int argc, char *argv[])
 		throw system_error(errno);
 
 	/* Construct and start the solvers */
-	solver_thread *threads[nr_threads];
+	solver_thread<> *threads[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i) {
-		threads[i] = new solver_thread(i, variables, reverse_variables, clauses);
+		threads[i] = new solver_thread<>(i, variables, reverse_variables, clauses);
 		threads[i]->start();
 	}
 
