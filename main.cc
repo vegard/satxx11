@@ -124,6 +124,26 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 	should_exit = true;
 }
 
+class decide_random {
+public:
+	decide_random(solver &s)
+	{
+	}
+
+	literal operator()(solver &s)
+	{
+		/* Find unassigned literal (XXX: Use heuristic) */
+		unsigned int variable;
+
+		/* Pick a variable at random */
+		do {
+			variable = rand() % s.nr_variables;
+		} while (s.defined(variable));
+
+		return literal(variable, rand() % 2);
+	}
+};
+
 class analyze_1uip {
 public:
 	analyze_1uip(solver &s)
@@ -204,7 +224,8 @@ public:
 	}
 };
 
-template<class Analyze = analyze_1uip>
+template<class Decide = decide_random,
+	class Analyze = analyze_1uip>
 class solver_thread:
 	public thread
 {
@@ -234,19 +255,6 @@ public:
 
 	~solver_thread()
 	{
-	}
-
-	literal next_decision_literal(solver &s)
-	{
-		/* Find unassigned literal (XXX: Use heuristic) */
-		unsigned int variable;
-
-		/* Pick a variable at random */
-		do {
-			variable = rand() % nr_variables;
-		} while (s.defined(variable));
-
-		return literal(variable, rand() % 2);
 	}
 
 	void verify(solver &s)
@@ -306,6 +314,7 @@ public:
 		 * used on. I'm not sure if these are really worth optimising
 		 * for, though. */
 		solver s(nr_variables, clauses);
+		Decide decide(s);
 		Analyze analyze(s);
 
 		while (!should_exit) {
@@ -321,7 +330,7 @@ public:
 				verify(s);
 			}
 
-			s.decision(next_decision_literal(s));
+			s.decision(decide(s));
 			while (!s.propagate() && !should_exit)
 				analyze(s);
 
