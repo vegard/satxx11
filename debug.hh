@@ -22,47 +22,60 @@
 #include <cstdio>
 #include <typeinfo>
 
+#include "format.hh"
+#include "unique_name.hh"
+
 /* XXX: This should move to its own .cc file, but it only matters as long as
  * we have more than one .cc file to begin with (and both of them need
  * debug.hh) */
 __thread unsigned int debug_thread_id;
 __thread unsigned int debug_call_depth;
 
-/* A bit ugly, but this macro magic lets us trace function calls very
- * prettily. The purpose of the do { ... } while (0) is to ensure correct
- * nesting in all cases (e.g. if (...) debug(...);). The ({ ... }) syntax
- * lets us return a value from a block (the last expression/statement in
- * the block is taken as the value of the whole block). It is also
- * important not to evaluate arguments more than once, etc. */
+/* A bit ugly, but this macro and template magic lets us trace function calls
+ * very prettily. */
 
 #if CONFIG_DEBUG == 1
-#define debug(fmt, ...) \
-	printf("%u: %*s" fmt "\n", debug_thread_id, debug_call_depth, "", ##__VA_ARGS__)
+
+template<typename... Args>
+static inline void debug(const char *fmt, Args... args)
+{
+	printf("%u: %*s%s\n", debug_thread_id, debug_call_depth, "",
+		format(fmt, args...).c_str());
+}
+
+class debug_enter_helper {
+public:
+	template<typename... Args>
+	debug_enter_helper(const char *function, const char *fmt, Args... args)
+	{
+		printf("%u: %*s%s(%s)\n", debug_thread_id, debug_call_depth, "",
+			function, format(fmt, args...).c_str());
+		debug_call_depth += 4;
+	}
+
+	~debug_enter_helper()
+	{
+		debug_call_depth -= 4;
+	}
+};
+
 #define debug_enter(fmt, ...) \
-	do { \
-		printf("%u: %*s%s(" fmt ")\n", debug_thread_id, debug_call_depth, "", __FUNCTION__, ##__VA_ARGS__); \
-		debug_call_depth += 4; \
-	} while (0)
-#define debug_leave \
-	do { \
-		printf("%u: %*sreturn\n", debug_thread_id, debug_call_depth, ""); \
-		debug_call_depth -= 4; \
-		return; \
-	} while (0)
-#define debug_return(val, fmt, ...) \
-	({ \
-		typeof(val) __tmp = (val); \
-		\
-		printf("%u: %*sreturn " fmt "\n", debug_thread_id, debug_call_depth, "", ##__VA_ARGS__); \
-		debug_call_depth -= 4; \
-		\
-		(__tmp); \
-	})
+	debug_enter_helper UNIQUE_NAME(debug_enter)(__FUNCTION__, fmt, ##__VA_ARGS__)
+
+template<typename t, typename... Args>
+static inline t debug_return(t x, const char *fmt, Args... args)
+{
+	printf("%u: %*sreturn %s\n", debug_thread_id, debug_call_depth, "",
+		format(fmt, x, args...).c_str());
+	return x;
+}
+
 #else
+
 #define debug(fmt, ...)
 #define debug_enter(fmt, ...)
-#define debug_leave return
 #define debug_return(val, fmt, ...) val
+
 #endif
 
 #endif

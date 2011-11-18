@@ -250,7 +250,7 @@ public:
 
 				do {
 					assert(reason);
-					debug("reason = %s", reason.string().c_str());
+					debug("reason = $", reason.string().c_str());
 
 					for (unsigned int i = 0; i < reason.size(); ++i) {
 						literal lit = reason[i];
@@ -289,7 +289,7 @@ public:
 				while (s.watches.size() <= clause_id)
 					s.watches.push_back(watch_indices());
 
-				debug("learnt = %s", learnt_clause.string().c_str());
+				debug("learnt = $", learnt_clause.string().c_str());
 
 				/* XXX: According to "A case for simple SAT solvers", we
 				 * should backtrack to the "next highest decision level" of

@@ -116,39 +116,33 @@ public:
 
 	void assign(unsigned int variable, bool value)
 	{
-		debug_enter("variable = %u, value = %u", variable, value);
+		debug_enter("variable = $, value = $", variable, value);
 
 		assert_hotpath(variable < nr_variables);
 		assert_hotpath(!defined(variable));
 		valuation[2 * variable + 0] = true;
 		valuation[2 * variable + 1] = value;
-
-		debug_leave;
 	}
 
 	void assign(literal l, bool value)
 	{
-		debug_enter("literal = %s, value = %u", l.string().c_str(), value);
+		debug_enter("literal = $, value = $", l.string().c_str(), value);
 
 		assign(l.variable(), l.value() == value);
-
-		debug_leave;
 	}
 
 	void unassign(unsigned int variable)
 	{
-		debug_enter("variable = %u", variable);
+		debug_enter("variable = $", variable);
 
 		assert_hotpath(variable < nr_variables);
 		assert_hotpath(defined(variable));
 		valuation[2 * variable + 0] = false;
-
-		debug_leave;
 	}
 
 	void attach(clause c, watch_indices w)
 	{
-		debug_enter("clause = %s", c.string().c_str());
+		debug_enter("clause = $", c.string().c_str());
 
 		assert_hotpath(c.size() >= 2);
 
@@ -159,13 +153,11 @@ public:
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
 		watches[c.index()] = w;
-
-		debug_leave;
 	}
 
 	void attach(clause c)
 	{
-		debug_enter("clause = %s", c.string().c_str());
+		debug_enter("clause = $", c.string().c_str());
 
 		assert_hotpath(c.size() >= 2);
 
@@ -204,24 +196,20 @@ public:
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
 		watches[c.index()] = w;
-
-		debug_leave;
 	}
 
 	void detach(clause c)
 	{
-		debug_enter("clause = %s", c.string().c_str());
+		debug_enter("clause = $", c.string().c_str());
 
 		watch_indices w = watches[c.index()];
 		watchlists[~c[w[0]]].remove(c);
 		watchlists[~c[w[1]]].remove(c);
-
-		debug_leave;
 	}
 
 	void decision(literal lit)
 	{
-		debug_enter("literal = %s", lit.string().c_str());
+		debug_enter("literal = $", lit.string().c_str());
 
 		assert_hotpath(!defined(lit));
 
@@ -234,8 +222,6 @@ public:
 		++decision_index;
 		levels[variable] = decision_index;
 		queue.push(lit);
-
-		debug_leave;
 	}
 
 	/* Called whenever a variable is forced to a particular value. The
@@ -243,17 +229,17 @@ public:
 	 * and this function will return false. */
 	bool implication(literal lit, clause reason)
 	{
-		debug_enter("literal = %s", lit.string().c_str());
+		debug_enter("literal = $", lit.string().c_str());
 
 		if (defined(lit)) {
 			/* If it's already defined to have the right value,
 			 * we don't have a conflict. */
 			if (value(lit))
-				return debug_return(true, "true /* no conflict; already defined */");
+				return debug_return(true, "$ /* no conflict; already defined */");
 
 			conflict_literal = lit;
 			conflict_reason = reason;
-			return debug_return(false, "false /* conflict */");
+			return debug_return(false, "$ /* conflict */");
 		}
 
 		unsigned int variable = lit.variable();
@@ -263,13 +249,13 @@ public:
 		reasons[variable] = reason;
 		levels[variable] = decision_index;
 		queue.push(lit);
-		return debug_return(true, "true /* no conflict */");
+		return debug_return(true, "$ /* no conflict */");
 	}
 
 	/* Return false if and only if there was a conflict. */
 	bool find_new_watch(clause c, unsigned int watch)
 	{
-		debug_enter("clause = %s", c.string().c_str());
+		debug_enter("clause = $", c.string().c_str());
 
 		/* At this point we know that the watchlists may not be
 		 * entirely in sync with the current assignments, because
@@ -288,7 +274,7 @@ public:
 					/* Literal was already satisfied;
 					 * clause is satisfied; we don't
 					 * need to do _anything_ else here */
-					return debug_return(true, "true /* clause is satisfied */");
+					return debug_return(true, "$ /* clause is satisfied */");
 				}
 
 				/* Literal was falsified; we cannot
@@ -304,19 +290,19 @@ public:
 			watchlists[~c[wi[watch]]].remove(c);
 			watches[c.index()][watch] = i;
 			watchlists[~l].insert(c);
-			return debug_return(true, "true /* found new watch */");
+			return debug_return(true, "$ /* found new watch */");
 		}
 
 		/* There was no other watch to replace the one we just
 		 * falsified; therefore, the other watched literal must
 		 * be satisfied (this is the implication). */
-		return debug_return(implication(c[wi[!watch]], c), "<same>");
+		return debug_return(implication(c[wi[!watch]], c), "$");
 	}
 
 	/* Return false if and only if there was a conflict. */
 	bool propagate(literal lit)
 	{
-		debug_enter("literal = %s", lit.string().c_str());
+		debug_enter("literal = $", lit.string().c_str());
 
 		/* Every variable that we are propagating should
 		 * already be defined with the correct polarity. */
@@ -328,7 +314,7 @@ public:
 		watchlist &w = watchlists[lit];
 
 		unsigned int n = w.size();
-		debug("watchlist size = %u", n);
+		debug("watchlist size = $", n);
 
 		for (unsigned int i = 0; i < n; ++i) {
 			clause c = w[i];
@@ -338,10 +324,10 @@ public:
 			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));
 
 			if (!find_new_watch(c, c[wi[1]] == ~lit))
-				return debug_return(false, "false");
+				return debug_return(false, "$");
 		}
 
-		return debug_return(true, "true");
+		return debug_return(true, "$");
 	}
 
 	/* Return false if and only if there was a conflict. */
@@ -356,22 +342,22 @@ public:
 			/* If propagation caused a conflict, abort the rest
 			 * of the conflicts as well. */
 			if (!propagate(lit))
-				return debug_return(false, "false");
+				return debug_return(false, "$");
 		}
 
-		return debug_return(true, "true");
+		return debug_return(true, "$");
 	}
 
 	void backtrack(unsigned int decision)
 	{
-		debug_enter("decision = %u", decision);
+		debug_enter("decision = $", decision);
 
 		assert(decision < decision_index);
 
 		/* Unassign the variables that we've assigned since the
 		 * given index. */
 		unsigned new_trail_index = decisions[decision];
-		debug("new trail index = %u", new_trail_index);
+		debug("new trail index = $", new_trail_index);
 
 		for (unsigned int i = trail_index; i-- > new_trail_index; )
 			unassign(trail[i]);
@@ -381,8 +367,6 @@ public:
 
 		/* Clear queue (XXX: Use trail for this) */
 		queue = std::queue<literal>();
-
-		debug_leave;
 	}
 };
 
