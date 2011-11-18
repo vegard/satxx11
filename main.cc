@@ -235,7 +235,7 @@ public:
 			}
 
 			s.decision(next_decision_literal(s));
-			if (!s.propagate()) {
+			while (!s.propagate() && !should_exit) {
 				/* Conflict analysis */
 				std::vector<bool> seen(s.nr_variables, false);
 
@@ -283,8 +283,11 @@ public:
 				conflict_clause.push_back(asserting_literal);
 
 				/* XXX: Deal with unit facts (1 literal) */
-				s.watches.push_back(watch_indices());
-				clause learnt_clause(clause_counter++, conflict_clause);
+				unsigned int clause_id = clause_counter++;
+				clause learnt_clause(clause_id, conflict_clause);
+
+				while (s.watches.size() <= clause_id)
+					s.watches.push_back(watch_indices());
 
 				debug("learnt = %s", learnt_clause.string().c_str());
 
@@ -293,16 +296,16 @@ public:
 				 * the learnt clause's literals. */
 				s.backtrack(new_decision_index);
 
-#if 0
 				/* Automatically force the opposite polarity for the last
 				 * variable (after backtracking its consequences). */
 				s.decision(asserting_literal);
 
 				/* Attach the newly learnt clause. It will be satisfied by
 				 * the decision above. */
-				if (learnt_clause.size() >= 2)
-					s.attach(learnt_clause);
-#endif
+				if (learnt_clause.size() >= 2) {
+					s.attach(learnt_clause,
+						watch_indices(learnt_clause.size() - 1, learnt_clause.size() - 2));
+				}
 			}
 
 			/* Let writers know that we're done with old copies

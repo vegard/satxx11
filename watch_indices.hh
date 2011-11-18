@@ -31,6 +31,15 @@ public:
 	 * clause. */
 	uint16_t index[2];
 
+	watch_indices()
+	{
+	}
+
+	watch_indices(uint16_t i, uint16_t j):
+		index({i, j})
+	{
+	}
+
 	uint16_t operator[](unsigned int i) const
 	{
 		return index[i];
