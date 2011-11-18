@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <map>
@@ -28,7 +29,6 @@
 
 extern "C" {
 #include <signal.h>
-#include <stdint.h>
 
 #include <sys/sysinfo.h>
 }

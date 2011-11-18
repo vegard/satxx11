@@ -21,13 +21,10 @@
 
 #include <cerrno>
 #include <cstdarg>
+#include <cstdint>
 #include <sstream>
 #include <string>
 #include <vector>
-
-extern "C" {
-#include <stdint.h>
-}
 
 #include "assert_hotpath.hh"
 #include "literal.hh"

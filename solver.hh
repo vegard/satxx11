@@ -20,13 +20,10 @@
 #define SOLVER_HH
 
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <queue>
 #include <vector>
-
-extern "C" {
-#include <stdint.h>
-}
 
 #include "assert_hotpath.hh"
 #include "clause.hh"

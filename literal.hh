@@ -19,13 +19,10 @@
 #ifndef LITERAL_HH
 #define LITERAL_HH
 
+#include <cstdint>
 #include <cstdlib>
 #include <sstream>
 #include <string>
-
-extern "C" {
-#include <stdint.h>
-}
 
 class literal {
 public:

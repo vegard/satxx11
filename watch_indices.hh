@@ -19,9 +19,7 @@
 #ifndef WATCH_INDICES_HH
 #define WATCH_INDICES_HH
 
-extern "C" {
-#include <stdint.h>
-}
+#include <cstdint>
 
 /* This class represents a pair of indices into the clause's literals. */
 class watch_indices {
