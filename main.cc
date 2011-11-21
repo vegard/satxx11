@@ -46,10 +46,13 @@ extern "C" {
 #include "decide_random.hh"
 #include "literal.hh"
 #include "propagate_watchlists.hh"
+#include "restart_and.hh"
 #include "restart_fixed.hh"
 #include "restart_geometric.hh"
 #include "restart_luby.hh"
 #include "restart_nested.hh"
+#include "restart_not.hh"
+#include "restart_or.hh"
 #include "thread.hh"
 
 typedef unsigned int variable;
