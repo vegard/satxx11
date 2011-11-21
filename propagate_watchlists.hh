@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SOLVER_HH
-#define SOLVER_HH
+#ifndef PROPAGATE_WATCHLISTS_HH
+#define PROPAGATE_WATCHLISTS_HH
 
 #include <cassert>
 #include <cstdint>
@@ -33,7 +33,7 @@
 #include "watch_indices.hh"
 #include "watchlist.hh"
 
-class solver {
+class propagate_watchlists {
 public:
 	unsigned int nr_variables;
 
@@ -64,7 +64,7 @@ public:
 	literal conflict_literal;
 	clause conflict_reason;
 
-	solver(unsigned int nr_variables, const std::vector<clause> &clauses):
+	propagate_watchlists(unsigned int nr_variables, const std::vector<clause> &clauses):
 		nr_variables(nr_variables),
 		valuation(2 * nr_variables),
 		watchlists(new watchlist[2 * nr_variables]),
@@ -81,7 +81,7 @@ public:
 			attach(clauses[i]);
 	}
 
-	~solver()
+	~propagate_watchlists()
 	{
 		delete[] watchlists;
 		delete[] trail;

@@ -43,7 +43,7 @@ extern "C" {
 #include "clause.hh"
 #include "debug.hh"
 #include "literal.hh"
-#include "solver.hh"
+#include "propagate_watchlists.hh"
 #include "thread.hh"
 
 typedef unsigned int variable;
@@ -139,8 +139,8 @@ public:
 	{
 	}
 
-	template<class Solver, class PropagationEngine>
-	literal operator()(Solver &s, PropagationEngine &pe)
+	template<class Solver, class Propagate>
+	literal operator()(Solver &s, Propagate &p)
 	{
 		/* Find unassigned literal */
 		unsigned int variable;
@@ -148,7 +148,7 @@ public:
 		/* Pick a variable at random */
 		do {
 			variable = rand() % s.nr_variables;
-		} while (pe.defined(variable));
+		} while (p.defined(variable));
 
 		return literal(variable, rand() % 2);
 	}
@@ -161,19 +161,19 @@ public:
 	{
 	}
 
-	template<class Solver, class PropagationEngine>
-	void operator()(Solver &s, PropagationEngine &pe)
+	template<class Solver, class Propagate>
+	void operator()(Solver &s, Propagate &p)
 	{
-		std::vector<bool> seen(pe.nr_variables, false);
+		std::vector<bool> seen(p.nr_variables, false);
 
-		unsigned int trail_index = pe.trail_index;
+		unsigned int trail_index = p.trail_index;
 
 		unsigned int counter = 0;
 		std::vector<literal> conflict_clause;
 		unsigned int new_decision_index = 0;
 
 		unsigned int variable;
-		clause reason = pe.conflict_reason;
+		clause reason = p.conflict_reason;
 
 		do {
 			assert(reason);
@@ -186,35 +186,35 @@ public:
 				if (!seen[variable]) {
 					seen[variable] = true;
 
-					if (pe.levels[variable] == pe.decision_index) {
+					if (p.levels[variable] == p.decision_index) {
 						++counter;
 					} else {
 						/* XXX: Exclude variables from decision level 0 */
 						conflict_clause.push_back(lit);
-						if (pe.levels[variable] > new_decision_index)
-							new_decision_index = pe.levels[variable];
+						if (p.levels[variable] > new_decision_index)
+							new_decision_index = p.levels[variable];
 					}
 				}
 			}
 
 			do {
-				variable = pe.trail[--trail_index];
+				variable = p.trail[--trail_index];
 			} while (!seen[variable]);
 
-			reason = pe.reasons[variable];
+			reason = p.reasons[variable];
 
 			--counter;
 		} while (counter > 0);
 
-		literal asserting_literal = ~literal(variable, pe.value(variable));
+		literal asserting_literal = ~literal(variable, p.value(variable));
 		conflict_clause.push_back(asserting_literal);
 
 		/* XXX: Deal with unit facts (1 literal) */
 		unsigned int clause_id = clause_counter++;
 		clause learnt_clause(clause_id, conflict_clause);
 
-		while (pe.watches.size() <= clause_id)
-			pe.watches.push_back(watch_indices());
+		while (p.watches.size() <= clause_id)
+			p.watches.push_back(watch_indices());
 
 		debug("learnt = $", learnt_clause);
 
@@ -236,13 +236,14 @@ public:
 	}
 };
 
-template<class Decide = decide_random,
+template<class Propagate = propagate_watchlists,
+	class Decide = decide_random,
 	class Analyze = analyze_1uip>
 class solver_thread:
 	public thread
 {
 public:
-	solver s;
+	Propagate propagate;
 	Decide decide;
 	Analyze analyze;
 
@@ -257,7 +258,7 @@ public:
 		const variable_map &variables,
 		const variable_map &reverse_variables,
 		const clause_vector &clauses):
-		s(variables.size(), clauses),
+		propagate(variables.size(), clauses),
 		decide(*this),
 		analyze(*this),
 		/* XXX: This gives a way to seed each thread independently,
@@ -278,35 +279,30 @@ public:
 
 	void attach(clause c)
 	{
-		s.attach(c);
+		propagate.attach(c);
 		decide.attach(c);
 	}
 
 	void attach(clause c, watch_indices w)
 	{
-		s.attach(c, w);
+		propagate.attach(c, w);
 		decide.attach(c);
 	}
 
 	void detach(clause c)
 	{
-		s.detach(c);
+		propagate.detach(c);
 		decide.detach(c);
 	}
 
 	void decision(literal lit)
 	{
-		s.decision(lit);
-	}
-
-	bool propagate()
-	{
-		return s.propagate();
+		propagate.decision(lit);
 	}
 
 	void backtrack(unsigned int decision)
 	{
-		s.backtrack(decision);
+		propagate.backtrack(decision);
 	}
 
 	void verify()
@@ -317,8 +313,8 @@ public:
 
 			bool v = false;
 			for (unsigned int j = 0; j < c.size(); ++j) {
-				assert(s.defined(c[j]));
-				v = v || s.value(c[j]);
+				assert(propagate.defined(c[j]));
+				v = v || propagate.value(c[j]);
 			}
 
 			assert(v);
@@ -330,20 +326,20 @@ public:
 		variable_map::const_iterator end = variables.end();
 
 		if (it != end) {
-			assert(s.defined(it->second));
+			assert(propagate.defined(it->second));
 
-			if (!s.value(it->second))
+			if (!propagate.value(it->second))
 				ss << "-";
 
 			ss << it->first;
 		}
 
 		while (++it != end) {
-			assert(s.defined(it->second));
+			assert(propagate.defined(it->second));
 
 			ss << " ";
 
-			if (!s.value(it->second))
+			if (!propagate.value(it->second))
 				ss << "-";
 
 			ss << it->first;
@@ -368,14 +364,14 @@ public:
 			/* If we have assigned values to all the variables
 			 * without reaching a conflict, this means that the
 			 * current assignment satisfies the instance. */
-			if (s.trail_index == nr_variables) {
+			if (propagate.trail_index == nr_variables) {
 				should_exit = true;
 				verify();
 			}
 
-			s.decision(decide(*this, s));
-			while (!s.propagate() && !should_exit)
-				analyze(*this, s);
+			propagate.decision(decide(*this, propagate));
+			while (!propagate.propagate() && !should_exit)
+				analyze(*this, propagate);
 
 			/* Let writers know that we're done with old copies
 			 * of RCU-protected data. */
@@ -451,7 +447,6 @@ int main(int argc, char *argv[])
 			printf("c sizeof(clause) = %lu\n", sizeof(clause));
 			printf("c sizeof(clause::impl) = %lu\n", sizeof(clause::impl));
 			printf("c sizeof(literal) = %lu\n", sizeof(literal));
-			printf("c sizeof(solver) = %lu\n", sizeof(solver));
 			printf("c sizeof(solver_thread) = %lu\n", sizeof(solver_thread<>));
 			printf("c sizeof(watch_indices) = %lu\n", sizeof(watch_indices));
 			printf("c sizeof(watchlist) = %lu\n", sizeof(watchlist));
