@@ -22,10 +22,10 @@
 #include <cstdio>
 #include <fstream>
 #include <map>
+#include <random>
 #include <sstream>
 
 #include <boost/program_options.hpp>
-#include <boost/random.hpp>
 
 extern "C" {
 #include <signal.h>
@@ -137,7 +137,7 @@ public:
 	Decide decide;
 	Analyze analyze;
 
-	boost::mt19937 rand;
+	std::mt19937 rand;
 	unsigned int id;
 	unsigned int nr_variables;
 	const variable_map &variables;
