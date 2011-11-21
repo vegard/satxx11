@@ -126,18 +126,19 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 	should_exit = true;
 }
 
-template<class Propagate = propagate_watchlists,
+template<class Random = std::mt19937,
+	class Propagate = propagate_watchlists,
 	class Decide = decide_random,
 	class Analyze = analyze_1uip>
 class solver_thread:
 	public thread
 {
 public:
+	Random random;
 	Propagate propagate;
 	Decide decide;
 	Analyze analyze;
 
-	std::mt19937 rand;
 	unsigned int id;
 	unsigned int nr_variables;
 	const variable_map &variables;
@@ -149,13 +150,13 @@ public:
 		const variable_map &variables,
 		const variable_map &reverse_variables,
 		const clause_vector &clauses):
-		propagate(variables.size(), clauses),
-		decide(*this),
-		analyze(*this),
 		/* XXX: This gives a way to seed each thread independently,
 		 * but we should still derive the seeds from the kernel's
 		 * "true" random number generator. */
-		rand(id),
+		random(id),
+		propagate(variables.size(), clauses),
+		decide(*this),
+		analyze(*this),
 		id(id),
 		nr_variables(variables.size()),
 		variables(variables),
