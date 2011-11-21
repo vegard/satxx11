@@ -126,19 +126,29 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 
 class decide_random {
 public:
-	decide_random(solver &s)
+	template<class Solver>
+	decide_random(Solver &s)
 	{
 	}
 
-	literal operator()(solver &s)
+	void attach(clause c)
 	{
-		/* Find unassigned literal (XXX: Use heuristic) */
+	}
+
+	void detatch(clause c)
+	{
+	}
+
+	template<class Solver, class PropagationEngine>
+	literal operator()(Solver &s, PropagationEngine &pe)
+	{
+		/* Find unassigned literal */
 		unsigned int variable;
 
 		/* Pick a variable at random */
 		do {
 			variable = rand() % s.nr_variables;
-		} while (s.defined(variable));
+		} while (pe.defined(variable));
 
 		return literal(variable, rand() % 2);
 	}
@@ -146,22 +156,24 @@ public:
 
 class analyze_1uip {
 public:
-	analyze_1uip(solver &s)
+	template<class Solver>
+	analyze_1uip(Solver &s)
 	{
 	}
 
-	void operator()(solver &s)
+	template<class Solver, class PropagationEngine>
+	void operator()(Solver &s, PropagationEngine &pe)
 	{
-		std::vector<bool> seen(s.nr_variables, false);
+		std::vector<bool> seen(pe.nr_variables, false);
 
-		unsigned int trail_index = s.trail_index;
+		unsigned int trail_index = pe.trail_index;
 
 		unsigned int counter = 0;
 		std::vector<literal> conflict_clause;
 		unsigned int new_decision_index = 0;
 
 		unsigned int variable;
-		clause reason = s.conflict_reason;
+		clause reason = pe.conflict_reason;
 
 		do {
 			assert(reason);
@@ -174,35 +186,35 @@ public:
 				if (!seen[variable]) {
 					seen[variable] = true;
 
-					if (s.levels[variable] == s.decision_index) {
+					if (pe.levels[variable] == pe.decision_index) {
 						++counter;
 					} else {
 						/* XXX: Exclude variables from decision level 0 */
 						conflict_clause.push_back(lit);
-						if (s.levels[variable] > new_decision_index)
-							new_decision_index = s.levels[variable];
+						if (pe.levels[variable] > new_decision_index)
+							new_decision_index = pe.levels[variable];
 					}
 				}
 			}
 
 			do {
-				variable = s.trail[--trail_index];
+				variable = pe.trail[--trail_index];
 			} while (!seen[variable]);
 
-			reason = s.reasons[variable];
+			reason = pe.reasons[variable];
 
 			--counter;
 		} while (counter > 0);
 
-		literal asserting_literal = ~literal(variable, s.value(variable));
+		literal asserting_literal = ~literal(variable, pe.value(variable));
 		conflict_clause.push_back(asserting_literal);
 
 		/* XXX: Deal with unit facts (1 literal) */
 		unsigned int clause_id = clause_counter++;
 		clause learnt_clause(clause_id, conflict_clause);
 
-		while (s.watches.size() <= clause_id)
-			s.watches.push_back(watch_indices());
+		while (pe.watches.size() <= clause_id)
+			pe.watches.push_back(watch_indices());
 
 		debug("learnt = $", learnt_clause);
 
@@ -230,6 +242,10 @@ class solver_thread:
 	public thread
 {
 public:
+	solver s;
+	Decide decide;
+	Analyze analyze;
+
 	boost::mt19937 rand;
 	unsigned int id;
 	unsigned int nr_variables;
@@ -241,6 +257,9 @@ public:
 		const variable_map &variables,
 		const variable_map &reverse_variables,
 		const clause_vector &clauses):
+		s(variables.size(), clauses),
+		decide(*this),
+		analyze(*this),
 		/* XXX: This gives a way to seed each thread independently,
 		 * but we should still derive the seeds from the kernel's
 		 * "true" random number generator. */
@@ -257,7 +276,40 @@ public:
 	{
 	}
 
-	void verify(solver &s)
+	void attach(clause c)
+	{
+		s.attach(c);
+		decide.attach(c);
+	}
+
+	void attach(clause c, watch_indices w)
+	{
+		s.attach(c, w);
+		decide.attach(c);
+	}
+
+	void detach(clause c)
+	{
+		s.detach(c);
+		decide.detach(c);
+	}
+
+	void decision(literal lit)
+	{
+		s.decision(lit);
+	}
+
+	bool propagate()
+	{
+		return s.propagate();
+	}
+
+	void backtrack(unsigned int decision)
+	{
+		s.backtrack(decision);
+	}
+
+	void verify()
 	{
 		/* Verify that the solution is indeed a solution */
 		for (unsigned int i = 0; i < clauses.size(); ++i) {
@@ -308,15 +360,6 @@ public:
 		printf("c Thread %u started\n", id);
 		debug_thread_id = id;
 
-		/* Construct the solver from within the new thread; this is
-		 * supposed to 1) increase parallelism; and 2) give a hint to
-		 * the memory allocator about which CPU the memory will be
-		 * used on. I'm not sure if these are really worth optimising
-		 * for, though. */
-		solver s(nr_variables, clauses);
-		Decide decide(s);
-		Analyze analyze(s);
-
 		while (!should_exit) {
 			/* XXX: Receive learnt clauses from other threads */
 
@@ -327,12 +370,12 @@ public:
 			 * current assignment satisfies the instance. */
 			if (s.trail_index == nr_variables) {
 				should_exit = true;
-				verify(s);
+				verify();
 			}
 
-			s.decision(decide(s));
+			s.decision(decide(*this, s));
 			while (!s.propagate() && !should_exit)
-				analyze(s);
+				analyze(*this, s);
 
 			/* Let writers know that we're done with old copies
 			 * of RCU-protected data. */
