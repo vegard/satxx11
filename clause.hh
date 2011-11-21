@@ -20,7 +20,6 @@
 #define CLAUSE_HH
 
 #include <cerrno>
-#include <cstdarg>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -66,23 +65,25 @@ public:
 		data = new (ptr) impl(size, index, v);
 	}
 
+	template<typename... Args>
+	static void collect_literals(std::vector<literal> &v)
+	{
+	}
+
+	template<typename... Args>
+	static void collect_literals(std::vector<literal> &v, int lit, Args... args)
+	{
+		v.push_back(literal(lit));
+		collect_literals(v, args...);
+	}
+
 	/* For convenience. */
-	clause(unsigned int index, ...)
+	template<typename... Args>
+	clause(unsigned int index, Args... args)
 	{
 		std::vector<literal> v;
 
-		va_list ap;
-		va_start(ap, index);
-
-		while (1) {
-			int lit = va_arg(ap, int);
-			if (lit == 0)
-				break;
-
-			v.push_back(literal(lit));
-		}
-
-		va_end(ap);
+		collect_literals(v, args...);
 
 		unsigned int size = v.size();
 		assert(size >= 1);
