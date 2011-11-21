@@ -130,7 +130,7 @@ template<class Random = std::mt19937,
 	class Decide = decide_random,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
-	class Restart = restart_nested<restart_geometric<2, 10>, restart_geometric<100, 10>>>
+	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>>
 class solver {
 public:
 	Random random;
@@ -260,12 +260,15 @@ public:
 				verify();
 			}
 
-			if (restart())
-				backtrack(0);
-
 			propagate.decision(decide(*this, propagate));
-			while (!propagate.propagate() && !should_exit)
+			while (!propagate.propagate() && !should_exit) {
+				if (restart()) {
+					backtrack(0);
+					break;
+				}
+
 				analyze(*this, propagate);
+			}
 
 #if 0
 			/* Let writers know that we're done with old copies
