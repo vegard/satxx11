@@ -127,16 +127,16 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 }
 
 template<class Random = std::mt19937,
-	class Propagate = propagate_watchlists,
 	class Decide = decide_random,
+	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip>
 class solver_thread:
 	public thread
 {
 public:
 	Random random;
-	Propagate propagate;
 	Decide decide;
+	Propagate propagate;
 	Analyze analyze;
 
 	unsigned int id;
@@ -154,8 +154,8 @@ public:
 		 * but we should still derive the seeds from the kernel's
 		 * "true" random number generator. */
 		random(id),
-		propagate(variables.size(), clauses),
 		decide(*this),
+		propagate(variables.size(), clauses),
 		analyze(*this),
 		id(id),
 		nr_variables(variables.size()),
