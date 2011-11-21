@@ -10,8 +10,6 @@ config_assert_hotpath=1
 config_debug=0
 
 
-urcu=userspace-rcu-0.6.4
-
 defines="-DCONFIG_ASSERT_HOTPATH=${config_assert_hotpath} -DCONFIG_DEBUG=${config_debug}"
 
-g++ -std=gnu++0x -O3 -Wall -g -I"${urcu}" -L"${urcu}/.libs" -D_LGPL_SOURCE ${defines} -o solver main.cc -lboost_program_options -lpthread -lurcu-qsbr
+g++ -std=gnu++0x -O3 -Wall -g -D_LGPL_SOURCE ${defines} -o solver main.cc -lboost_program_options -lpthread

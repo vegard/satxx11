@@ -34,13 +34,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-extern "C" {
-#include <urcu-qsbr.h>
-/* XXX: urcu/compiler.h workaround for C++ */
-#undef max
-#undef min
-}
-
 #include "analyze_1uip.hh"
 #include "clause.hh"
 #include "debug.hh"
@@ -274,9 +267,11 @@ public:
 			while (!propagate.propagate() && !should_exit)
 				analyze(*this, propagate);
 
+#if 0
 			/* Let writers know that we're done with old copies
 			 * of RCU-protected data. */
 			rcu_quiescent_state();
+#endif
 		}
 
 		printf("c Thread %u stopping\n", id);
