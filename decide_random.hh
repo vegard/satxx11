@@ -27,10 +27,10 @@ public:
 
 		/* Pick a variable at random */
 		do {
-			variable = rand() % s.nr_variables;
+			variable = s.rand() % s.nr_variables;
 		} while (p.defined(variable));
 
-		return literal(variable, rand() % 2);
+		return literal(variable, s.rand() % 2);
 	}
 };
 
