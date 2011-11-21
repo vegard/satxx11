@@ -5,14 +5,15 @@ class restart_luby {
 private:
 	static unsigned int luby(unsigned int i)
 	{
-		unsigned int k;
-		for (k = 1; k < 32; ++k)
-			if (i == (1 << k) - 1)
+		for (unsigned int k = 1; k < 32; ++k) {
+			if (i == (1U << k) - 1)
 				return 1 << (k - 1);
+		}
 
-		for (k = 1; ; ++k)
-			if ((1 << (k - 1)) <= i && i < (1 << k) - 1)
+		for (unsigned int k = 1; ; ++k) {
+			if ((1U << (k - 1)) <= i && i < (1U << k) - 1)
 				return luby(i - (1 << (k - 1)) + 1);
+		}
 	}
 
 public:
