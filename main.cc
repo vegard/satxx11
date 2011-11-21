@@ -46,6 +46,8 @@ extern "C" {
 #include "decide_random.hh"
 #include "literal.hh"
 #include "propagate_watchlists.hh"
+#include "restart_geometric.hh"
+#include "restart_nested.hh"
 #include "thread.hh"
 
 typedef unsigned int variable;
@@ -129,7 +131,8 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 template<class Random = std::mt19937,
 	class Decide = decide_random,
 	class Propagate = propagate_watchlists,
-	class Analyze = analyze_1uip>
+	class Analyze = analyze_1uip,
+	class Restart = restart_nested<restart_geometric<2, 10>, restart_geometric<100, 10>>>
 class solver_thread:
 	public thread
 {
@@ -138,6 +141,7 @@ public:
 	Decide decide;
 	Propagate propagate;
 	Analyze analyze;
+	Restart restart;
 
 	unsigned int id;
 	unsigned int nr_variables;
@@ -259,6 +263,9 @@ public:
 				should_exit = true;
 				verify();
 			}
+
+			if (restart())
+				backtrack(0);
 
 			propagate.decision(decide(*this, propagate));
 			while (!propagate.propagate() && !should_exit)
