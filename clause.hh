@@ -100,7 +100,12 @@ public:
 		::free((void *) data);
 	}
 
-	bool operator==(const clause &other)
+	bool operator<(const clause &other) const
+	{
+		return data < other.data;
+	}
+
+	bool operator==(const clause &other) const
 	{
 		return data == other.data;
 	}
