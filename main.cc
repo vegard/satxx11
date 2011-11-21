@@ -42,6 +42,7 @@ extern "C" {
 
 #include "clause.hh"
 #include "debug.hh"
+#include "decide_random.hh"
 #include "literal.hh"
 #include "propagate_watchlists.hh"
 #include "thread.hh"
@@ -123,36 +124,6 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 
 	should_exit = true;
 }
-
-class decide_random {
-public:
-	template<class Solver>
-	decide_random(Solver &s)
-	{
-	}
-
-	void attach(clause c)
-	{
-	}
-
-	void detatch(clause c)
-	{
-	}
-
-	template<class Solver, class Propagate>
-	literal operator()(Solver &s, Propagate &p)
-	{
-		/* Find unassigned literal */
-		unsigned int variable;
-
-		/* Pick a variable at random */
-		do {
-			variable = rand() % s.nr_variables;
-		} while (p.defined(variable));
-
-		return literal(variable, rand() % 2);
-	}
-};
 
 class analyze_1uip {
 public:
