@@ -46,7 +46,9 @@ extern "C" {
 #include "decide_random.hh"
 #include "literal.hh"
 #include "propagate_watchlists.hh"
+#include "restart_fixed.hh"
 #include "restart_geometric.hh"
+#include "restart_luby.hh"
 #include "restart_nested.hh"
 #include "thread.hh"
 
