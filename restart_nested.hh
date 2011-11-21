@@ -13,14 +13,12 @@ public:
 
 	bool operator()()
 	{
-		if (inner()) {
-			if (outer())
-				inner = InnerRestart();
+		if (!inner())
+			return false;
 
-			return true;
-		}
-
-		return false;
+		if (outer())
+			inner = InnerRestart();
+		return true;
 	}
 };
 
