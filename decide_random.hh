@@ -15,7 +15,7 @@ public:
 	{
 	}
 
-	void detatch(clause c)
+	void detach(clause c)
 	{
 	}
 
