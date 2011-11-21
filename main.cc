@@ -244,8 +244,6 @@ public:
 
 	void run()
 	{
-		static unsigned int nr_conflicts = 0;
-
 		printf("c Thread %u started\n", id);
 		debug_thread_id = id;
 
