@@ -40,6 +40,7 @@ extern "C" {
 #include "decide_random.hh"
 #include "literal.hh"
 #include "propagate_watchlists.hh"
+#include "reduce_noop.hh"
 #include "restart_and.hh"
 #include "restart_fixed.hh"
 #include "restart_geometric.hh"
@@ -130,7 +131,8 @@ template<class Random = std::ranlux24_base,
 	class Decide = decide_random,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
-	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>>
+	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
+	class Reduce = reduce_noop>
 class solver {
 public:
 	Random random;
@@ -138,6 +140,7 @@ public:
 	Propagate propagate;
 	Analyze analyze;
 	Restart restart;
+	Reduce reduce;
 
 	unsigned int id;
 	unsigned int nr_variables;
@@ -157,6 +160,7 @@ public:
 		decide(*this),
 		propagate(variables.size(), clauses),
 		analyze(*this),
+		reduce(*this),
 		id(id),
 		nr_variables(variables.size()),
 		variables(variables),
@@ -170,22 +174,30 @@ public:
 	{
 	}
 
+	bool is_learnt(clause c)
+	{
+		return c.index() >= clauses.size();
+	}
+
 	void attach(clause c)
 	{
 		propagate.attach(c);
 		decide.attach(c);
+		reduce.attach(*this, c);
 	}
 
 	void attach(clause c, watch_indices w)
 	{
 		propagate.attach(c, w);
 		decide.attach(c);
+		reduce.attach(*this, c);
 	}
 
 	void detach(clause c)
 	{
 		propagate.detach(c);
 		decide.detach(c);
+		reduce.detach(*this, c);
 	}
 
 	void decision(literal lit)
@@ -264,6 +276,7 @@ public:
 			while (!propagate.propagate() && !should_exit) {
 				if (restart()) {
 					backtrack(0);
+					reduce(*this);
 					break;
 				}
 
