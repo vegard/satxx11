@@ -24,6 +24,7 @@
 #include <map>
 #include <random>
 #include <sstream>
+#include <thread>
 
 #include <boost/program_options.hpp>
 
@@ -53,7 +54,6 @@ extern "C" {
 #include "restart_nested.hh"
 #include "restart_not.hh"
 #include "restart_or.hh"
-#include "thread.hh"
 
 typedef unsigned int variable;
 typedef std::map<variable, variable> variable_map;
@@ -138,9 +138,7 @@ template<class Random = std::mt19937,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Restart = restart_nested<restart_geometric<2, 10>, restart_geometric<100, 10>>>
-class solver_thread:
-	public thread
-{
+class solver {
 public:
 	Random random;
 	Decide decide;
@@ -155,7 +153,7 @@ public:
 	const clause_vector &clauses;
 	std::atomic<unsigned int> *clause_counter;
 
-	solver_thread(unsigned int id,
+	solver(unsigned int id,
 		const variable_map &variables,
 		const variable_map &reverse_variables,
 		const clause_vector &clauses):
@@ -175,7 +173,7 @@ public:
 	{
 	}
 
-	~solver_thread()
+	~solver()
 	{
 	}
 
@@ -285,6 +283,12 @@ public:
 	}
 };
 
+template<typename t>
+static void solve(t *s)
+{
+	s->run();
+}
+
 int main(int argc, char *argv[])
 {
 #if CONFIG_DEBUG == 1
@@ -350,7 +354,7 @@ int main(int argc, char *argv[])
 			printf("c sizeof(clause) = %lu\n", sizeof(clause));
 			printf("c sizeof(clause::impl) = %lu\n", sizeof(clause::impl));
 			printf("c sizeof(literal) = %lu\n", sizeof(literal));
-			printf("c sizeof(solver_thread) = %lu\n", sizeof(solver_thread<>));
+			printf("c sizeof(solver<>) = %lu\n", sizeof(solver<>));
 			printf("c sizeof(watch_indices) = %lu\n", sizeof(watch_indices));
 			printf("c sizeof(watchlist) = %lu\n", sizeof(watchlist));
 			return 0;
@@ -392,18 +396,22 @@ int main(int argc, char *argv[])
 	if (::sigaction(SIGINT, &sigint_act, NULL) == -1)
 		throw system_error(errno);
 
-	/* Construct and start the solvers */
-	solver_thread<> *threads[nr_threads];
-	for (unsigned int i = 0; i < nr_threads; ++i) {
-		threads[i] = new solver_thread<>(i, variables, reverse_variables, clauses);
-		threads[i]->start();
-	}
+	/* XXX: Make all the stuff below RAII (we currently don't clean up
+	 * if anything bad happens = an exception is thrown). */
+
+	/* Construct the solvers */
+	solver<> *solvers[nr_threads];
+	for (unsigned int i = 0; i < nr_threads; ++i)
+		solvers[i] = new solver<>(i, variables, reverse_variables, clauses);
+
+	/* Start threads */
+	std::thread *threads[nr_threads];
+	for (unsigned int i = 0; i < nr_threads; ++i)
+		threads[i] = new std::thread(solve<solver<>>, solvers[i]);
 
 	/* Wait for the solvers to finish/exit */
-	for (unsigned int i = 0; i < nr_threads; ++i) {
+	for (unsigned int i = 0; i < nr_threads; ++i)
 		threads[i]->join();
-		delete threads[i];
-	}
 
 	/* Free clauses */
 	for (unsigned int i = 0; i < clauses.size(); ++i)

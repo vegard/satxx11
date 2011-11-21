@@ -29,7 +29,6 @@
 #include "clause.hh"
 #include "debug.hh"
 #include "literal.hh"
-#include "thread.hh"
 #include "watch_indices.hh"
 #include "watchlist.hh"
 
