@@ -126,7 +126,7 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 	should_exit = true;
 }
 
-template<class Random = std::mt19937,
+template<class Random = std::ranlux24_base,
 	class Decide = decide_random,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
