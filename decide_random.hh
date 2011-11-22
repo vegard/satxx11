@@ -22,6 +22,8 @@ public:
 	template<class Solver, class Propagate>
 	literal operator()(Solver &s, Propagate &p)
 	{
+		assert(p.trail_index < s.nr_variables);
+
 		/* Find unassigned literal */
 		unsigned int variable;
 
