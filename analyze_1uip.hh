@@ -36,6 +36,9 @@ public:
 	template<class Solver, class Propagate>
 	void operator()(Solver &s, Propagate &p)
 	{
+		/* This algorithm comes from the MiniSat paper:
+		 * http://minisat.se/downloads/MiniSat.pdf */
+
 		std::vector<bool> seen(p.nr_variables, false);
 
 		unsigned int trail_index = p.trail_index;
