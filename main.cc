@@ -52,10 +52,12 @@ extern "C" {
 typedef unsigned int variable;
 typedef std::map<variable, variable> variable_map;
 typedef std::vector<clause> clause_vector;
+typedef std::vector<literal> literal_vector;
 
 void read_cnf(std::istream &file,
 	variable_map &variables, variable_map &reverse_variables,
-	clause_vector &clauses)
+	clause_vector &clauses,
+	literal_vector &unit_clauses)
 {
 	while (!file.eof()) {
 		std::string line;
@@ -103,7 +105,10 @@ void read_cnf(std::istream &file,
 			c.push_back(literal(v2, x > 0));
 		}
 
-		clauses.push_back(clause(clauses.size(), c));
+		if (c.size() == 1)
+			unit_clauses.push_back(c[0]);
+		else
+			clauses.push_back(clause(clauses.size(), c));
 	}
 
 	printf("c Variables: %lu\n", variables.size());
@@ -153,7 +158,8 @@ public:
 	solver(unsigned int id,
 		const variable_map &variables,
 		const variable_map &reverse_variables,
-		const clause_vector &clauses):
+		const clause_vector &clauses,
+		const literal_vector &unit_clauses):
 		/* XXX: This gives a way to seed each thread independently,
 		 * but we should still derive the seeds from the kernel's
 		 * "true" random number generator. */
@@ -409,6 +415,7 @@ int main(int argc, char *argv[])
 	variable_map variables;
 	variable_map reverse_variables;
 	clause_vector clauses;
+	literal_vector unit_clauses;
 
 	if (input_files.size() >= 1) {
 		for (unsigned int i = 0; i < input_files.size(); ++i) {
@@ -419,12 +426,12 @@ int main(int argc, char *argv[])
 				throw std::runtime_error("Could not open file");
 
 			printf("c Reading %s\n", input_files[i].c_str());
-			read_cnf(file, variables, reverse_variables, clauses);
+			read_cnf(file, variables, reverse_variables, clauses, unit_clauses);
 			file.close();
 		}
 	} else {
 		printf("c Reading standard input\n");
-		read_cnf(std::cin, variables, reverse_variables, clauses);
+		read_cnf(std::cin, variables, reverse_variables, clauses, unit_clauses);
 	}
 
 	clause_counter = clauses.size();
@@ -446,7 +453,7 @@ int main(int argc, char *argv[])
 	/* Construct the solvers */
 	solver<> *solvers[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i)
-		solvers[i] = new solver<>(i, variables, reverse_variables, clauses);
+		solvers[i] = new solver<>(i, variables, reverse_variables, clauses, unit_clauses);
 
 	/* Start threads */
 	std::thread *threads[nr_threads];
