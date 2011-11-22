@@ -112,6 +112,7 @@ void read_cnf(std::istream &file,
 	assert(variables.size() == reverse_variables.size());
 }
 
+static bool keep_going = false;
 
 /* XXX: Go through their use points and add/remove the necessary memory
  * barriers */
@@ -268,9 +269,38 @@ public:
 			 * without reaching a conflict, this means that the
 			 * current assignment satisfies the instance. */
 			if (propagate.trail_index == nr_variables) {
-				should_exit = true;
+				if (!keep_going) {
+					should_exit = true;
+					verify();
+					break;
+				}
+
 				verify();
-				break;
+
+				/* Add the negated current set of decisions
+				 * as a clause; this will prevent the solver
+				 * from finding the same solution again. */
+				std::vector<literal> conflict_clause;
+
+				for (unsigned int i = 0; i < propagate.decision_index; ++i) {
+					unsigned int variable = propagate.trail[propagate.decisions[i]];
+
+					conflict_clause.push_back(literal(variable,
+						!propagate.value(variable)));
+				}
+
+				backtrack(0);
+
+				/* XXX: Deal with unit clauses */
+				if (conflict_clause.size() >= 2) {
+					unsigned int clause_id = (*clause_counter)++;
+					clause learnt_clause(clause_id, conflict_clause);
+
+					while (propagate.watches.size() <= clause_id)
+						propagate.watches.push_back(watch_indices());
+
+					attach(learnt_clause);
+				}
 			}
 
 			propagate.decision(decide(*this, propagate));
@@ -327,6 +357,7 @@ int main(int argc, char *argv[])
 		options_description options("Options");
 		options.add_options()
 			("help", "Display this information")
+			("keep-going", value<bool>(&keep_going)->zero_tokens(), "find all solutions")
 			("threads", value<unsigned int>(&nr_threads), "number of threads")
 			("input", value<std::vector<std::string> >(&input_files), "input file")
 		;
