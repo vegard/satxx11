@@ -270,6 +270,7 @@ public:
 			if (propagate.trail_index == nr_variables) {
 				should_exit = true;
 				verify();
+				break;
 			}
 
 			propagate.decision(decide(*this, propagate));
