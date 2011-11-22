@@ -63,11 +63,11 @@ public:
 	literal conflict_literal;
 	clause conflict_reason;
 
-	propagate_watchlists(unsigned int nr_variables, const std::vector<clause> &clauses):
+	propagate_watchlists(unsigned int nr_variables, unsigned int nr_clauses):
 		nr_variables(nr_variables),
 		valuation(2 * nr_variables),
 		watchlists(new watchlist[2 * nr_variables]),
-		watches(clauses.size()),
+		watches(nr_clauses),
 		trail(new unsigned int[nr_variables]),
 		trail_index(0),
 		decisions(new unsigned int[nr_variables]),
@@ -75,9 +75,6 @@ public:
 		reasons(new clause[nr_variables]),
 		levels(new unsigned int[nr_variables])
 	{
-		/* Attach all clauses in the original instance */
-		for (unsigned int i = 0; i < clauses.size(); ++i)
-			attach(clauses[i]);
 	}
 
 	~propagate_watchlists()

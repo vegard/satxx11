@@ -159,7 +159,7 @@ public:
 		 * "true" random number generator. */
 		random(id),
 		decide(*this),
-		propagate(variables.size(), clauses),
+		propagate(variables.size(), clauses.size()),
 		analyze(*this),
 		reduce(*this),
 		id(id),
@@ -169,6 +169,9 @@ public:
 		clauses(clauses),
 		clause_counter(&::clause_counter)
 	{
+		/* Attach all clauses in the original instance */
+		for (unsigned int i = 0; i < clauses.size(); ++i)
+			attach(clauses[i]);
 	}
 
 	~solver()
