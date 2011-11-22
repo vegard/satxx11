@@ -296,7 +296,7 @@ public:
 			 * without reaching a conflict, this means that the
 			 * current assignment satisfies the instance. */
 			if (propagate.trail_index == nr_variables) {
-				if (!keep_going) {
+				if (propagate.decision_index == 0 || !keep_going) {
 					should_exit = true;
 					verify();
 					break;
@@ -318,8 +318,18 @@ public:
 
 				backtrack(0);
 
-				/* XXX: Deal with unit clauses */
-				if (conflict_clause.size() >= 2) {
+				assert(!conflict_clause.empty());
+				if (conflict_clause.size() == 1) {
+					/* XXX: This can never fail, so we should not check
+					 * whether it does in the hotpath. */
+					bool ret = propagate.implication(conflict_clause[0], clause());
+					assert(ret);
+
+					if (!propagate.propagate()) {
+						should_exit = true;
+						break;
+					}
+				} else {
 					unsigned int clause_id = (*clause_counter)++;
 					clause learnt_clause(clause_id, conflict_clause);
 
@@ -328,6 +338,8 @@ public:
 
 					attach(learnt_clause);
 				}
+
+				continue;
 			}
 
 			propagate.decision(decide(*this, propagate));

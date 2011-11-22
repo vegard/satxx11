@@ -61,10 +61,11 @@ public:
 				if (!seen[variable]) {
 					seen[variable] = true;
 
-					if (p.levels[variable] == p.decision_index) {
+					unsigned int level = p.levels[variable];
+					if (level == p.decision_index) {
 						++counter;
-					} else {
-						/* XXX: Exclude variables from decision level 0 */
+					} else if (level > 0) {
+						/* Exclude variables from decision level 0 */
 						conflict_clause.push_back(lit);
 						if (p.levels[variable] > new_decision_index)
 							new_decision_index = p.levels[variable];
@@ -73,38 +74,49 @@ public:
 			}
 
 			do {
+				assert_hotpath(trail_index > 0);
 				variable = p.trail[--trail_index];
 			} while (!seen[variable]);
 
 			reason = p.reasons[variable];
 
+			assert_hotpath(counter > 0);
 			--counter;
 		} while (counter > 0);
 
 		literal asserting_literal = ~literal(variable, p.value(variable));
-		conflict_clause.push_back(asserting_literal);
-
-		/* XXX: Deal with unit facts (1 literal) */
-		unsigned int clause_id = (*s.clause_counter)++;
-		clause learnt_clause(clause_id, conflict_clause);
-
-		while (p.watches.size() <= clause_id)
-			p.watches.push_back(watch_indices());
-
-		debug("learnt = $", learnt_clause);
 
 		/* XXX: According to "A case for simple SAT solvers", we
 		 * should backtrack to the "next highest decision level" of
 		 * the learnt clause's literals. */
 		s.backtrack(new_decision_index);
 
-		/* Automatically force the opposite polarity for the last
-		 * variable (after backtracking its consequences). */
-		s.decision(asserting_literal);
+		if (conflict_clause.size() == 0) {
+			assert(new_decision_index == 0);
 
-		/* Attach the newly learnt clause. It will be satisfied by
-		 * the decision above. */
-		if (learnt_clause.size() >= 2) {
+			debug("learnt = $", asserting_literal);
+
+			/* XXX: This can never fail, so we should not check
+			 * whether it does in the hotpath. */
+			bool ret = p.implication(asserting_literal, clause());
+			assert(ret);
+		} else {
+			conflict_clause.push_back(asserting_literal);
+
+			unsigned int clause_id = (*s.clause_counter)++;
+			clause learnt_clause(clause_id, conflict_clause);
+
+			while (p.watches.size() <= clause_id)
+				p.watches.push_back(watch_indices());
+
+			debug("learnt = $", learnt_clause);
+
+			/* Automatically force the opposite polarity for the last
+			 * variable (after backtracking its consequences). */
+			s.decision(asserting_literal);
+
+			/* Attach the newly learnt clause. It will be satisfied by
+			 * the decision above. */
 			s.attach(learnt_clause,
 				watch_indices(learnt_clause.size() - 1, learnt_clause.size() - 2));
 		}
