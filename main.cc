@@ -39,6 +39,8 @@ extern "C" {
 #include "debug.hh"
 #include "decide_random.hh"
 #include "literal.hh"
+#include "print_noop.hh"
+#include "print_stdio.hh"
 #include "propagate_watchlists.hh"
 #include "reduce_noop.hh"
 #include "restart_and.hh"
@@ -138,7 +140,8 @@ template<class Random = std::ranlux24_base,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
-	class Reduce = reduce_noop>
+	class Reduce = reduce_noop,
+	class Print = print_stdio>
 class solver {
 public:
 	Random random;
@@ -147,6 +150,7 @@ public:
 	Analyze analyze;
 	Restart restart;
 	Reduce reduce;
+	Print print;
 
 	unsigned int id;
 	unsigned int nr_variables;
@@ -169,6 +173,7 @@ public:
 		propagate(variables.size(), clauses.size()),
 		analyze(*this),
 		reduce(*this),
+		print(*this),
 		id(id),
 		nr_variables(variables.size()),
 		variables(variables),
@@ -193,6 +198,7 @@ public:
 		propagate.attach(c);
 		decide.attach(c);
 		reduce.attach(*this, c);
+		print.attach(*this, c);
 	}
 
 	void attach(clause c, watch_indices w)
@@ -200,6 +206,7 @@ public:
 		propagate.attach(c, w);
 		decide.attach(c);
 		reduce.attach(*this, c);
+		print.attach(*this, c);
 	}
 
 	void detach(clause c)
@@ -207,16 +214,19 @@ public:
 		propagate.detach(c);
 		decide.detach(c);
 		reduce.detach(*this, c);
+		print.detach(*this, c);
 	}
 
 	void decision(literal lit)
 	{
 		propagate.decision(lit);
+		print.decision(*this, lit);
 	}
 
 	void backtrack(unsigned int decision)
 	{
 		propagate.backtrack(decision);
+		print.backtrack(*this, decision);
 	}
 
 	void verify()
