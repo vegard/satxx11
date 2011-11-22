@@ -153,6 +153,7 @@ public:
 	const variable_map &variables;
 	const variable_map &reverse_variables;
 	const clause_vector &clauses;
+	const literal_vector &unit_clauses;
 	std::atomic<unsigned int> *clause_counter;
 
 	solver(unsigned int id,
@@ -173,11 +174,9 @@ public:
 		variables(variables),
 		reverse_variables(reverse_variables),
 		clauses(clauses),
+		unit_clauses(unit_clauses),
 		clause_counter(&::clause_counter)
 	{
-		/* Attach all clauses in the original instance */
-		for (unsigned int i = 0; i < clauses.size(); ++i)
-			attach(clauses[i]);
 	}
 
 	~solver()
@@ -264,10 +263,29 @@ public:
 		printf("c SATISFIABLE\n");
 	}
 
+	void unsat()
+	{
+		should_exit = true;
+		printf("c UNSATISFIABLE\n");
+	}
+
 	void run()
 	{
 		printf("c Thread %u started\n", id);
 		debug_thread_id = id;
+
+		/* Attach all clauses in the original instance */
+		for (clause c: clauses)
+			attach(c);
+
+		/* Queue unit clauses */
+		for (literal l: unit_clauses) {
+			if (!propagate.implication(l, clause()))
+				unsat();
+		}
+
+		if (!should_exit && !propagate.propagate())
+			unsat();
 
 		while (!should_exit) {
 			/* XXX: Receive learnt clauses from other threads */
