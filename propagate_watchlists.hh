@@ -246,7 +246,7 @@ public:
 	}
 
 	/* Return false if and only if there was a conflict. */
-	bool find_new_watch(clause c, unsigned int watch)
+	bool find_new_watch(clause c, unsigned int watch, bool &replace)
 	{
 		debug_enter("clause = $", c);
 
@@ -280,7 +280,7 @@ public:
 				continue;
 
 			/* Replace the old watch with the new one */
-			watchlists[~c[wi[watch]]].remove(c);
+			replace = true;
 			watches[c.index()][watch] = i;
 			watchlists[~l].insert(c);
 			return debug_return(true, "$ /* found new watch */");
@@ -309,15 +309,25 @@ public:
 		unsigned int n = w.size();
 		debug("watchlist size = $", n);
 
-		for (unsigned int i = 0; i < n; ++i) {
+		for (unsigned int i = 0; i < n;) {
+			assert_hotpath(i < w.size());
+
 			clause c = w[i];
 			watch_indices wi = watches[c.index()];
 
 			/* This literal is exactly one of the watched literals */
 			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));
 
-			if (!find_new_watch(c, c[wi[1]] == ~lit))
+			bool replace = false;
+			if (!find_new_watch(c, c[wi[1]] == ~lit, replace))
 				return debug_return(false, "$");
+
+			if (replace) {
+				w.watches[i] = w.watches[--n];
+				w.watches.pop_back();
+			} else {
+				++i;
+			}
 		}
 
 		return debug_return(true, "$");
