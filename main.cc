@@ -38,6 +38,7 @@ extern "C" {
 #include "clause.hh"
 #include "debug.hh"
 #include "decide_random.hh"
+#include "decide_vsids.hh"
 #include "literal.hh"
 #include "print_noop.hh"
 #include "print_stdio.hh"
@@ -136,7 +137,7 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 }
 
 template<class Random = std::ranlux24_base,
-	class Decide = decide_random,
+	class Decide = decide_vsids,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
