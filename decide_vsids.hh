@@ -70,6 +70,10 @@ public:
 				positions[l] = l;
 			}
 		}
+
+		/* Just a way to break ties between multiple threads */
+		for (unsigned int i = 0; i < 100; ++i)
+			bump(literal(s.random() % s.nr_variables, s.random() % 2));
 	}
 
 	~decide_vsids()
