@@ -240,10 +240,19 @@ int main(int argc, char *argv[])
 	/* XXX: Make all the stuff below RAII (we currently don't clean up
 	 * if anything bad happens = an exception is thrown). */
 
+	unsigned long seed;
+	{
+		struct timeval tv;
+		int err = gettimeofday(&tv, NULL);
+		assert(!err);
+
+		seed = tv.tv_sec * 1000000 + tv.tv_usec;
+	}
+
 	/* Construct the solvers */
 	solver<> *solvers[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i)
-		solvers[i] = new solver<>(i, keep_going, should_exit, clause_counter, variables, reverse_variables, clauses, unit_clauses);
+		solvers[i] = new solver<>(i, keep_going, should_exit, clause_counter, seed + i, variables, reverse_variables, clauses, unit_clauses);
 
 	/* Start threads */
 	std::thread *threads[nr_threads];

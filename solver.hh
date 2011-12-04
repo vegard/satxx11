@@ -76,6 +76,7 @@ public:
 		bool keep_going,
 		std::atomic<bool> &should_exit,
 		std::atomic<unsigned int> &clause_counter,
+		unsigned long seed,
 		const variable_map &variables,
 		const variable_map &reverse_variables,
 		const clause_vector &clauses,
@@ -92,7 +93,7 @@ public:
 		/* XXX: This gives a way to seed each thread independently,
 		 * but we should still derive the seeds from the kernel's
 		 * "true" random number generator. */
-		random(id),
+		random(seed),
 		decide(*this),
 		propagate(variables.size(), clauses.size()),
 		analyze(*this),
