@@ -144,14 +144,6 @@ template<class Random = std::ranlux24_base,
 	class Print = print_stdio>
 class solver {
 public:
-	Random random;
-	Decide decide;
-	Propagate propagate;
-	Analyze analyze;
-	Restart restart;
-	Reduce reduce;
-	Print print;
-
 	unsigned int id;
 	unsigned int nr_variables;
 	const variable_map &variables;
@@ -160,11 +152,26 @@ public:
 	const literal_vector &unit_clauses;
 	std::atomic<unsigned int> *clause_counter;
 
+	Random random;
+	Decide decide;
+	Propagate propagate;
+	Analyze analyze;
+	Restart restart;
+	Reduce reduce;
+	Print print;
+
 	solver(unsigned int id,
 		const variable_map &variables,
 		const variable_map &reverse_variables,
 		const clause_vector &clauses,
 		const literal_vector &unit_clauses):
+		id(id),
+		nr_variables(variables.size()),
+		variables(variables),
+		reverse_variables(reverse_variables),
+		clauses(clauses),
+		unit_clauses(unit_clauses),
+		clause_counter(&::clause_counter),
 		/* XXX: This gives a way to seed each thread independently,
 		 * but we should still derive the seeds from the kernel's
 		 * "true" random number generator. */
@@ -173,14 +180,7 @@ public:
 		propagate(variables.size(), clauses.size()),
 		analyze(*this),
 		reduce(*this),
-		print(*this),
-		id(id),
-		nr_variables(variables.size()),
-		variables(variables),
-		reverse_variables(reverse_variables),
-		clauses(clauses),
-		unit_clauses(unit_clauses),
-		clause_counter(&::clause_counter)
+		print(*this)
 	{
 	}
 
