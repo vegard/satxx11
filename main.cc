@@ -30,7 +30,9 @@
 extern "C" {
 #include <signal.h>
 
+#include <sys/resource.h>
 #include <sys/sysinfo.h>
+#include <sys/time.h>
 }
 
 #include "clause.hh"
@@ -255,6 +257,14 @@ int main(int argc, char *argv[])
 	/* Free clauses */
 	for (unsigned int i = 0; i < clauses.size(); ++i)
 		clauses[i].free();
+
+	{
+		struct rusage usage;
+		int err = getrusage(RUSAGE_SELF, &usage);
+		assert(err == 0);
+
+		printf("c CPU user time %lu.%06lu\n", usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
+	}
 
 	return 0;
 }
