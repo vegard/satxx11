@@ -40,6 +40,30 @@
 #include "restart_not.hh"
 #include "restart_or.hh"
 
+/* Workaround for missing implementation in libstdc++ for gcc 4.6. */
+namespace std {
+
+void atomic_thread_fence(memory_order __m)
+{
+	switch (__m) {
+	case memory_order_relaxed:
+		break;
+	case memory_order_acquire:
+		asm volatile ("lfence" : : : "memory");
+		break;
+	case memory_order_release:
+		asm volatile ("sfence" : : : "memory");
+		break;
+	case memory_order_acq_rel:
+		asm volatile ("mfence" : : : "memory");
+		break;
+	default:
+		assert(false);
+	}
+}
+
+}
+
 typedef unsigned int variable;
 typedef std::map<variable, variable> variable_map;
 typedef std::vector<clause> clause_vector;
