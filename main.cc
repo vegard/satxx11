@@ -247,9 +247,14 @@ int main(int argc, char *argv[])
 	}
 
 	/* Construct the solvers */
+	/* XXX: It would be nice if we could make an array of solvers instead of
+	 * an array of pointers to solvers. Just to be able to skip that extra
+	 * layer of indirection sometimes. But it makes construction difficult,
+	 * unless we separate some of the initialisation from construction, which
+	 * is admittedly ugly. */
 	solver<> *solvers[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i)
-		solvers[i] = new solver<>(nr_threads, i, keep_going, should_exit, seed + i, variables, reverse_variables, clauses, unit_clauses);
+		solvers[i] = new solver<>(nr_threads, solvers, i, keep_going, should_exit, seed + i, variables, reverse_variables, clauses, unit_clauses);
 
 	/* Start threads */
 	std::thread *threads[nr_threads];

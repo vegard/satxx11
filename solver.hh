@@ -78,6 +78,8 @@ template<class Random = std::ranlux24_base,
 	class Print = print_stdio>
 class solver {
 public:
+	unsigned int nr_threads;
+	solver **solvers;
 	unsigned int id;
 	bool keep_going;
 	std::atomic<bool> &should_exit;
@@ -88,6 +90,29 @@ public:
 	const clause_vector &clauses;
 	const literal_vector &unit_clauses;
 
+	/* A message to/from other threads */
+	struct message {
+		bool empty;
+		std::vector<clause> learnt_clauses;
+		std::vector<unsigned int> detached_clauses;
+
+		message():
+			empty(true)
+		{
+		}
+	};
+
+	/* Outgoing messages to other threads; indexed by thread id */
+	message **output;
+
+	std::atomic<message *> channel;
+
+	/* Clauses which have been received from other threads but which
+	 * are not yet attached (because we had to wait for a restart to
+	 * attach them). XXX: This might go away if we figure out a nice
+	 * way to attach clauses on partial backtracks. */
+	std::vector<clause> pending_clauses;
+
 	Random random;
 	Decide decide;
 	Propagate propagate;
@@ -97,6 +122,7 @@ public:
 	Print print;
 
 	solver(unsigned int nr_threads,
+		solver **solvers,
 		unsigned int id,
 		bool keep_going,
 		std::atomic<bool> &should_exit,
@@ -105,6 +131,9 @@ public:
 		const variable_map &reverse_variables,
 		const clause_vector &clauses,
 		const literal_vector &unit_clauses):
+
+		nr_threads(nr_threads),
+		solvers(solvers),
 		id(id),
 		keep_going(keep_going),
 		should_exit(should_exit),
@@ -115,6 +144,10 @@ public:
 		reverse_variables(reverse_variables),
 		clauses(clauses),
 		unit_clauses(unit_clauses),
+		/* XXX: Not RAII. */
+		output(new message *[nr_threads]),
+		channel(0),
+
 		random(seed),
 		decide(*this),
 		propagate(nr_threads, variables.size(), clauses.size()),
@@ -122,10 +155,16 @@ public:
 		reduce(*this),
 		print(*this)
 	{
+		for (unsigned int i = 0; i < nr_threads; ++i)
+			output[i] = new message();
 	}
 
 	~solver()
 	{
+		for (unsigned int i = 0; i < nr_threads; ++i)
+			delete output[i];
+
+		delete[] output;
 	}
 
 	bool is_learnt(clause c)
@@ -139,6 +178,17 @@ public:
 		decide.attach(c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
+	}
+
+	void share(clause c)
+	{
+		for (unsigned int i = 0; i < nr_threads; ++i) {
+			if (i == id)
+				continue;
+
+			output[i]->learnt_clauses.push_back(c);
+			output[i]->empty = false;
+		}
 	}
 
 	void attach(clause c, watch_indices w)
@@ -155,6 +205,12 @@ public:
 		decide.detach(c);
 		reduce.detach(*this, c);
 		print.detach(*this, c);
+
+		/* After this, we are not allowed to keep any references to the
+		 * clause. So signal to the owning thread that we no longer hold
+		 * a reference to it. */
+		output[c.thread()]->detached_clauses.push_back(c.index());
+		output[c.thread()]->empty = false;
 	}
 
 	void decision(literal lit)
@@ -167,6 +223,17 @@ public:
 	{
 		propagate.backtrack(decision);
 		print.backtrack(*this, decision);
+
+		if (decision == 0) {
+			/* XXX: This might change if/when we figure out that we
+			 * want to and can attach clauses at other times than a
+			 * full restart. */
+
+			for (clause c: pending_clauses)
+				attach(c);
+
+			pending_clauses.clear();
+		}
 	}
 
 	void verify()
@@ -238,7 +305,47 @@ public:
 			unsat();
 
 		while (!should_exit) {
-			/* XXX: Receive learnt clauses from other threads */
+			/* This orders the writes to our outgoing messages with the atomic
+			 * compare and exchange below. This barrier is paired with the
+			 * read barrier in incoming message reading code of the recipient
+			 * threads. */
+			std::atomic_thread_fence(std::memory_order_release);
+
+			/* Try to send outgoing messages */
+			for (unsigned int i = 0; i < nr_threads; ++i) {
+				if (i == id)
+					continue;
+
+				/* No messages to write. */
+				if (output[i]->empty)
+					continue;
+
+				message *expected = 0;
+				if (solvers[i]->channel.compare_exchange_strong(expected, output[i], std::memory_order_relaxed)) {
+					/* Sending was successful. */
+					output[i] = new message();
+				} else {
+					/* Sending failed. In this case, we just leave the message
+					 * as it is, and hope that it will succeed some time in the
+					 * future. */
+				}
+			}
+
+			/* Read incoming messages */
+			message *m = channel.exchange(0, std::memory_order_relaxed);
+			if (m) {
+				/* Process message */
+				for (clause c: m->learnt_clauses)
+					pending_clauses.push_back(c);
+
+				/* XXX: Decrement reference counts for detached clauses */
+				delete m;
+			}
+
+			/* This orders our reads from incoming messages with the atomic
+			 * exchange above. This barrier is paired with the write barrier
+			 * in outgoing message writing code of the sender threads. */
+			std::atomic_thread_fence(std::memory_order_acquire);
 
 			/* Search */
 

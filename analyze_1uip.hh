@@ -115,6 +115,7 @@ public:
 			 * the decision above. */
 			s.attach(learnt_clause,
 				watch_indices(learnt_clause.size() - 1, learnt_clause.size() - 2));
+			s.share(learnt_clause);
 		}
 	}
 };
