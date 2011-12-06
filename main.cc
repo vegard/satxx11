@@ -99,7 +99,7 @@ void read_cnf(std::istream &file,
 		if (c.size() == 1)
 			unit_clauses.push_back(c[0]);
 		else
-			clauses.push_back(clause(clauses.size(), c));
+			clauses.push_back(clause(0, clauses.size(), c));
 	}
 
 	printf("c Variables: %lu\n", variables.size());
@@ -113,7 +113,6 @@ static bool keep_going = false;
 /* XXX: Go through their use points and add/remove the necessary memory
  * barriers */
 static std::atomic<bool> should_exit;
-static std::atomic<unsigned int> clause_counter;
 
 static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 {
@@ -224,8 +223,6 @@ int main(int argc, char *argv[])
 		read_cnf(std::cin, variables, reverse_variables, clauses, unit_clauses);
 	}
 
-	clause_counter = clauses.size();
-
 	/* Catch Ctrl-C and stop the threads gracefully (NOTE: Do this after
 	 * reading the instance, to allow the default handler to abort the
 	 * program "ungracefully" while reading the instance). */
@@ -252,7 +249,7 @@ int main(int argc, char *argv[])
 	/* Construct the solvers */
 	solver<> *solvers[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i)
-		solvers[i] = new solver<>(i, keep_going, should_exit, clause_counter, seed + i, variables, reverse_variables, clauses, unit_clauses);
+		solvers[i] = new solver<>(nr_threads, i, keep_going, should_exit, seed + i, variables, reverse_variables, clauses, unit_clauses);
 
 	/* Start threads */
 	std::thread *threads[nr_threads];

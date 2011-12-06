@@ -33,13 +33,16 @@ class clause {
 public:
 	class impl {
 	public:
-		uint32_t size;
+		/* Attempt to pack these.. We might also need flags for learnt, etc. */
 		uint32_t index;
+		uint16_t thread;
+		uint16_t size;
 		literal literals[0];
 
-		impl(uint32_t size, uint32_t index, const std::vector<literal> &v):
-			size(size),
-			index(index)
+		impl(uint16_t thread, uint32_t index, uint16_t size, const std::vector<literal> &v):
+			thread(thread),
+			index(index),
+			size(size)
 		{
 			for (unsigned int i = 0; i < size; ++i)
 				literals[i] = v[i];
@@ -53,7 +56,7 @@ public:
 	{
 	}
 
-	clause(unsigned int index, const std::vector<literal> &v)
+	clause(unsigned int thread, unsigned int index, const std::vector<literal> &v)
 	{
 		unsigned int size = v.size();
 		assert(size >= 1);
@@ -62,7 +65,7 @@ public:
 		if (!ptr)
 			throw system_error(errno);
 
-		data = new (ptr) impl(size, index, v);
+		data = new (ptr) impl(thread, index, size, v);
 	}
 
 	template<typename... Args>
@@ -79,7 +82,7 @@ public:
 
 	/* For convenience. */
 	template<typename... Args>
-	clause(unsigned int index, Args... args)
+	clause(unsigned int thread, unsigned int index, Args... args)
 	{
 		std::vector<literal> v;
 
@@ -92,7 +95,7 @@ public:
 		if (!ptr)
 			throw system_error(errno);
 
-		data = new (ptr) impl(size, index, v);
+		data = new (ptr) impl(thread, index, size, v);
 	}
 
 	void free()
@@ -110,14 +113,19 @@ public:
 		return data == other.data;
 	}
 
-	uint32_t size() const
+	uint32_t thread() const
 	{
-		return data->size;
+		return data->thread;
 	}
 
 	uint32_t index() const
 	{
 		return data->index;
+	}
+
+	uint32_t size() const
+	{
+		return data->size;
 	}
 
 	literal operator[](unsigned int i) const
@@ -145,7 +153,7 @@ public:
 
 		std::ostringstream ss;
 
-		ss << "[" << data->index << "]";
+		ss << "[" << data->thread << ":" << data->index << "]";
 
 		for (unsigned int i = 0; i < data->size; ++i)
 			ss << " " << data->literals[i].string();

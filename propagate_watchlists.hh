@@ -39,7 +39,9 @@ public:
 	/* XXX: Maybe put this in its own class using uint8 or something. */
 	std::vector<bool> valuation;
 	watchlist *watchlists;
-	std::vector<watch_indices> watches;
+
+	/* Use as follows: watches[thread_id][clause_id] */
+	std::vector<watch_indices> *watches;
 
 	/* XXX: Use uint32_t for variables */
 	unsigned int *trail;
@@ -63,11 +65,11 @@ public:
 	literal conflict_literal;
 	clause conflict_reason;
 
-	propagate_watchlists(unsigned int nr_variables, unsigned int nr_clauses):
+	propagate_watchlists(unsigned int nr_threads, unsigned int nr_variables, unsigned int nr_clauses):
 		nr_variables(nr_variables),
 		valuation(2 * nr_variables),
 		watchlists(new watchlist[2 * nr_variables]),
-		watches(nr_clauses),
+		watches(new std::vector<watch_indices>[nr_threads]),
 		trail(new unsigned int[nr_variables]),
 		trail_index(0),
 		decisions(new unsigned int[nr_variables]),
@@ -80,6 +82,7 @@ public:
 	~propagate_watchlists()
 	{
 		delete[] watchlists;
+		delete[] watches;
 		delete[] trail;
 		delete[] decisions;
 	}
@@ -145,7 +148,11 @@ public:
 
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
-		watches[c.index()] = w;
+
+		/* XXX: A bit ugly. Please fix. */
+		if (watches[c.thread()].size() <= c.index())
+			watches[c.thread()].resize(c.index() + 1);
+		watches[c.thread()][c.index()] = w;
 	}
 
 	void attach(clause c)
@@ -188,14 +195,18 @@ public:
 
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
-		watches[c.index()] = w;
+
+		/* XXX: A bit ugly. Please fix. */
+		if (watches[c.thread()].size() <= c.index())
+			watches[c.thread()].resize(c.index() + 1);
+		watches[c.thread()][c.index()] = w;
 	}
 
 	void detach(clause c)
 	{
 		debug_enter("clause = $", c);
 
-		watch_indices w = watches[c.index()];
+		watch_indices w = watches[c.thread()][c.index()];
 		watchlists[~c[w[0]]].remove(c);
 		watchlists[~c[w[1]]].remove(c);
 	}
@@ -255,7 +266,7 @@ public:
 		 * variables are assigned before the propagations are
 		 * actually carried out (and watchlists updated). */
 
-		watch_indices wi = watches[c.index()];
+		watch_indices wi = watches[c.thread()][c.index()];
 
 		/* Find a new watch */
 		unsigned int n = c.size();
@@ -281,7 +292,7 @@ public:
 
 			/* Replace the old watch with the new one */
 			replace = true;
-			watches[c.index()][watch] = i;
+			watches[c.thread()][c.index()][watch] = i;
 			watchlists[~l].insert(c);
 			return debug_return(true, "$ /* found new watch */");
 		}
@@ -313,7 +324,7 @@ public:
 			assert_hotpath(i < w.size());
 
 			clause c = w[i];
-			watch_indices wi = watches[c.index()];
+			watch_indices wi = watches[c.thread()][c.index()];
 
 			/* This literal is exactly one of the watched literals */
 			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));

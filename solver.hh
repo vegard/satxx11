@@ -57,7 +57,7 @@ public:
 	unsigned int id;
 	bool keep_going;
 	std::atomic<bool> &should_exit;
-	std::atomic<unsigned int> &clause_counter;
+	unsigned int clause_counter;
 	unsigned int nr_variables;
 	const variable_map &variables;
 	const variable_map &reverse_variables;
@@ -72,10 +72,10 @@ public:
 	Reduce reduce;
 	Print print;
 
-	solver(unsigned int id,
+	solver(unsigned int nr_threads,
+		unsigned int id,
 		bool keep_going,
 		std::atomic<bool> &should_exit,
-		std::atomic<unsigned int> &clause_counter,
 		unsigned long seed,
 		const variable_map &variables,
 		const variable_map &reverse_variables,
@@ -84,7 +84,8 @@ public:
 		id(id),
 		keep_going(keep_going),
 		should_exit(should_exit),
-		clause_counter(clause_counter),
+		/* XXX: This is a bit ugly. Please fix. */
+		clause_counter(id == 0 ? clauses.size() : 0),
 		nr_variables(variables.size()),
 		variables(variables),
 		reverse_variables(reverse_variables),
@@ -95,7 +96,7 @@ public:
 		 * "true" random number generator. */
 		random(seed),
 		decide(*this),
-		propagate(variables.size(), clauses.size()),
+		propagate(nr_threads, variables.size(), clauses.size()),
 		analyze(*this),
 		reduce(*this),
 		print(*this)
@@ -258,13 +259,7 @@ public:
 						break;
 					}
 				} else {
-					unsigned int clause_id = clause_counter++;
-					clause learnt_clause(clause_id, conflict_clause);
-
-					while (propagate.watches.size() <= clause_id)
-						propagate.watches.push_back(watch_indices());
-
-					attach(learnt_clause);
+					attach(clause(id, clause_counter++, conflict_clause));
 				}
 
 				continue;

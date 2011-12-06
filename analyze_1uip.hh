@@ -103,11 +103,7 @@ public:
 		} else {
 			conflict_clause.push_back(asserting_literal);
 
-			unsigned int clause_id = s.clause_counter++;
-			clause learnt_clause(clause_id, conflict_clause);
-
-			while (p.watches.size() <= clause_id)
-				p.watches.push_back(watch_indices());
+			clause learnt_clause(s.id, s.clause_counter++, conflict_clause);
 
 			debug("learnt = $", learnt_clause);
 
