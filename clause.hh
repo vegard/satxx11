@@ -40,8 +40,8 @@ public:
 		literal literals[0];
 
 		impl(uint16_t thread, uint32_t index, uint16_t size, const std::vector<literal> &v):
-			thread(thread),
 			index(index),
+			thread(thread),
 			size(size)
 		{
 			for (unsigned int i = 0; i < size; ++i)
