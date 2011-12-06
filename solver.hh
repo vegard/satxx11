@@ -91,9 +91,6 @@ public:
 		reverse_variables(reverse_variables),
 		clauses(clauses),
 		unit_clauses(unit_clauses),
-		/* XXX: This gives a way to seed each thread independently,
-		 * but we should still derive the seeds from the kernel's
-		 * "true" random number generator. */
 		random(seed),
 		decide(*this),
 		propagate(nr_threads, variables.size(), clauses.size()),
