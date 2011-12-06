@@ -185,7 +185,7 @@ public:
 			ss << it->first;
 		}
 
-		printf("v %s\n", ss.str().c_str());
+		printf("v %s 0\n", ss.str().c_str());
 		printf("c SATISFIABLE\n");
 	}
 
