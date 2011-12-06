@@ -1,0 +1,14 @@
+SAT++11 (A.K.A. satxx11) -- Parallel SAT solver
+
+Here's my attempt at writing a scalable and efficient parallel SAT solver.
+Other design goals include compile-time extensibility and customisability
+using C++ templates and readable, well-documented code. It also makes
+extensive use of the new features in C++11 (hence the name).
+
+NOTE: The solver currently works, but is far from efficient. This is due
+to the fact that it is not finished; clause cleaning, for example, is not
+implemented, meaning that the clause database will just grow without
+bounds. It can solve small/simple instances, though.
+
+This code is licensed under GPL3; see the file COPYING for the complete
+license.
