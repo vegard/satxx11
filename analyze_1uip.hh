@@ -67,8 +67,8 @@ public:
 					} else if (level > 0) {
 						/* Exclude variables from decision level 0 */
 						conflict_clause.push_back(lit);
-						if (p.levels[variable] > new_decision_index)
-							new_decision_index = p.levels[variable];
+						if (level > new_decision_index)
+							new_decision_index = level;
 					}
 				}
 			}
