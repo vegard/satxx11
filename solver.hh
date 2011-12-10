@@ -395,6 +395,16 @@ public:
 
 			decision(decide(*this, propagate));
 			while (!propagate.propagate() && !should_exit) {
+				if (propagate.decision_index == 0) {
+					/* A conflict at decision level 0 means the instance
+					 * is unsat. */
+					unsat();
+					/* XXX: This breaks out of the inner loop, but we know
+					 * enough to break out of the outer loop too. Maybe a
+					 * a goto? */
+					break;
+				}
+
 				if (restart()) {
 					backtrack(0);
 					reduce(*this);
