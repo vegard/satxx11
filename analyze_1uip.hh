@@ -100,6 +100,8 @@ public:
 			 * whether it does in the hotpath. */
 			bool ret = p.implication(asserting_literal, clause());
 			assert(ret);
+
+			s.share(asserting_literal);
 		} else {
 			conflict_clause.push_back(asserting_literal);
 

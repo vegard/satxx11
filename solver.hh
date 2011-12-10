@@ -93,6 +93,7 @@ public:
 	/* A message to/from other threads */
 	struct message {
 		bool empty;
+		std::vector<literal> learnt_literals;
 		std::vector<clause> learnt_clauses;
 		std::vector<unsigned int> detached_clauses;
 
@@ -111,6 +112,7 @@ public:
 	 * are not yet attached (because we had to wait for a restart to
 	 * attach them). XXX: This might go away if we figure out a nice
 	 * way to attach clauses on partial backtracks. */
+	std::vector<literal> pending_literals;
 	std::vector<clause> pending_clauses;
 
 	Random random;
@@ -180,17 +182,6 @@ public:
 		print.attach(*this, c);
 	}
 
-	void share(clause c)
-	{
-		for (unsigned int i = 0; i < nr_threads; ++i) {
-			if (i == id)
-				continue;
-
-			output[i]->learnt_clauses.push_back(c);
-			output[i]->empty = false;
-		}
-	}
-
 	void attach(clause c, watch_indices w)
 	{
 		propagate.attach(c, w);
@@ -213,6 +204,28 @@ public:
 		output[c.thread()]->empty = false;
 	}
 
+	void share(literal l)
+	{
+		for (unsigned int i = 0; i < nr_threads; ++i) {
+			if (i == id)
+				continue;
+
+			output[i]->learnt_literals.push_back(l);
+			output[i]->empty = false;
+		}
+	}
+
+	void share(clause c)
+	{
+		for (unsigned int i = 0; i < nr_threads; ++i) {
+			if (i == id)
+				continue;
+
+			output[i]->learnt_clauses.push_back(c);
+			output[i]->empty = false;
+		}
+	}
+
 	void decision(literal lit)
 	{
 		propagate.decision(lit);
@@ -223,17 +236,33 @@ public:
 	{
 		propagate.backtrack(decision);
 		print.backtrack(*this, decision);
+	}
 
-		if (decision == 0) {
-			/* XXX: This might change if/when we figure out that we
-			 * want to and can attach clauses at other times than a
-			 * full restart. */
+	/* Returns false if and only if we detected unsat. This may happen
+	 * because we received some literals/clauses from other threads. */
+	bool backtrack()
+	{
+		backtrack(0);
 
-			for (clause c: pending_clauses)
-				attach(c);
-
-			pending_clauses.clear();
+		/* XXX: This might change if/when we figure out that we
+		 * want to and can attach clauses at other times than a
+		 * full restart. */
+		for (literal l: pending_literals) {
+			if (!propagate.implication(l, clause()))
+				return false;
 		}
+
+		pending_literals.clear();
+
+		if (!propagate.propagate())
+			return false;
+
+		for (clause c: pending_clauses)
+			attach(c);
+
+		pending_clauses.clear();
+
+		return true;
 	}
 
 	void verify()
@@ -335,6 +364,9 @@ public:
 			message *m = channel.exchange(0, std::memory_order_relaxed);
 			if (m) {
 				/* Process message */
+				for (literal l: m->learnt_literals)
+					pending_literals.push_back(l);
+
 				for (clause c: m->learnt_clauses)
 					pending_clauses.push_back(c);
 
@@ -386,8 +418,12 @@ public:
 						should_exit = true;
 						break;
 					}
+
+					share(conflict_clause[0]);
 				} else {
-					attach(clause(id, clause_counter++, conflict_clause));
+					clause learnt_clause(id, clause_counter++, conflict_clause);
+					attach(learnt_clause);
+					share(learnt_clause);
 				}
 
 				continue;
@@ -406,7 +442,11 @@ public:
 				}
 
 				if (restart()) {
-					backtrack(0);
+					if (!backtrack()) {
+						unsat();
+						break;
+					}
+
 					reduce(*this);
 					break;
 				}
