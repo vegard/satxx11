@@ -393,7 +393,7 @@ public:
 				continue;
 			}
 
-			propagate.decision(decide(*this, propagate));
+			decision(decide(*this, propagate));
 			while (!propagate.propagate() && !should_exit) {
 				if (restart()) {
 					backtrack(0);
