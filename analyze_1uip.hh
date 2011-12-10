@@ -109,10 +109,11 @@ public:
 
 			/* Automatically force the opposite polarity for the last
 			 * variable (after backtracking its consequences). */
-			s.decision(asserting_literal);
+			bool ret = p.implication(asserting_literal, learnt_clause);
+			assert(ret);
 
 			/* Attach the newly learnt clause. It will be satisfied by
-			 * the decision above. */
+			 * the implication above. */
 			s.attach(learnt_clause,
 				watch_indices(learnt_clause.size() - 1, learnt_clause.size() - 2));
 			s.share(learnt_clause);
