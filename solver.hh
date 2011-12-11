@@ -24,6 +24,7 @@
 
 #include "analyze_1uip.hh"
 #include "clause.hh"
+#include "clause_allocator.hh"
 #include "debug.hh"
 #include "decide_random.hh"
 #include "decide_vsids.hh"
@@ -67,8 +68,8 @@ void atomic_thread_fence(memory_order __m)
 
 typedef unsigned int variable;
 typedef std::map<variable, variable> variable_map;
-typedef std::vector<clause> clause_vector;
 typedef std::vector<literal> literal_vector;
+typedef std::vector<literal_vector> literal_vector_vector;
 
 template<class Random = std::ranlux24_base,
 	class Decide = decide_vsids,
@@ -84,12 +85,12 @@ public:
 	unsigned int id;
 	bool keep_going;
 	std::atomic<bool> &should_exit;
-	unsigned int clause_counter;
 	unsigned int nr_variables;
 	const variable_map &variables;
 	const variable_map &reverse_variables;
-	const clause_vector &clauses;
-	const literal_vector &unit_clauses;
+	const literal_vector_vector &original_clauses;
+
+	clause_allocator allocate;
 
 	/* A message to/from other threads */
 	struct message {
@@ -132,28 +133,25 @@ public:
 		unsigned long seed,
 		const variable_map &variables,
 		const variable_map &reverse_variables,
-		const clause_vector &clauses,
-		const literal_vector &unit_clauses):
+		const literal_vector_vector &original_clauses):
 
 		nr_threads(nr_threads),
 		solvers(solvers),
 		id(id),
 		keep_going(keep_going),
 		should_exit(should_exit),
-		/* XXX: This is a bit ugly. Please fix. */
-		clause_counter(id == 0 ? clauses.size() : 0),
 		nr_variables(variables.size()),
 		variables(variables),
 		reverse_variables(reverse_variables),
-		clauses(clauses),
-		unit_clauses(unit_clauses),
+		original_clauses(original_clauses),
+
 		/* XXX: Not RAII. */
 		output(new message *[nr_threads]),
 		channel(0),
 
 		random(seed),
 		decide(*this),
-		propagate(nr_threads, variables.size(), clauses.size()),
+		propagate(nr_threads, variables.size()),
 		analyze(*this),
 		reduce(*this),
 		print(*this)
@@ -168,11 +166,6 @@ public:
 			delete output[i];
 
 		delete[] output;
-	}
-
-	bool is_learnt(clause c)
-	{
-		return c.index() >= clauses.size();
 	}
 
 	void attach(clause c)
@@ -201,8 +194,16 @@ public:
 		/* After this, we are not allowed to keep any references to the
 		 * clause. So signal to the owning thread that we no longer hold
 		 * a reference to it. */
-		output[c.thread()]->detached_clauses.push_back(c.index());
-		output[c.thread()]->empty = false;
+		unsigned int thread = c.thread();
+		unsigned int index = c.index();
+
+		if (thread == id) {
+			/* We _are_ the owning thread. */
+			allocate.free(index);
+		} else {
+			output[thread]->detached_clauses.push_back(index);
+			output[thread]->empty = false;
+		}
 	}
 
 	void share(literal l)
@@ -269,13 +270,11 @@ public:
 	void verify()
 	{
 		/* Verify that the solution is indeed a solution */
-		for (unsigned int i = 0; i < clauses.size(); ++i) {
-			clause c = clauses[i];
-
+		for (literal_vector c: original_clauses) {
 			bool v = false;
-			for (unsigned int j = 0; j < c.size(); ++j) {
-				assert(propagate.defined(c[j]));
-				v = v || propagate.value(c[j]);
+			for (literal lit: c) {
+				assert(propagate.defined(lit));
+				v = v || propagate.value(lit);
 			}
 
 			assert(v);
@@ -316,17 +315,22 @@ public:
 		printf("c UNSATISFIABLE\n");
 	}
 
-	void run()
+	void run(const std::vector<literal> &literals, const std::vector<clause> &clauses)
 	{
 		printf("c Thread %u started\n", id);
 		debug_thread_id = id;
+
+		/* XXX: We currently attach clauses before propagating unit
+		 * literals because we might otherwise try to attach a clause
+		 * that would immediately propagate a value (and we don't
+		 * handle this in attach()). */
 
 		/* Attach all clauses in the original instance */
 		for (clause c: clauses)
 			attach(c);
 
 		/* Queue unit clauses */
-		for (literal l: unit_clauses) {
+		for (literal l: literals) {
 			if (!propagate.implication(l, clause()))
 				unsat();
 		}
@@ -365,13 +369,17 @@ public:
 			message *m = channel.exchange(0, std::memory_order_relaxed);
 			if (m) {
 				/* Process message */
+
 				for (literal l: m->learnt_literals)
 					pending_literals.push_back(l);
 
 				for (clause c: m->learnt_clauses)
 					pending_clauses.push_back(c);
 
-				/* XXX: Decrement reference counts for detached clauses */
+				/* Decrement reference counts for detached clauses */
+				for (unsigned int id: m->detached_clauses)
+					allocate.free(id);
+
 				delete m;
 			}
 
@@ -422,7 +430,7 @@ public:
 
 					share(conflict_clause[0]);
 				} else {
-					clause learnt_clause(id, clause_counter++, conflict_clause);
+					clause learnt_clause = allocate.allocate(nr_threads, id, false, conflict_clause);
 					attach(learnt_clause);
 					share(learnt_clause);
 				}

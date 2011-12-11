@@ -33,16 +33,19 @@ class clause {
 public:
 	class impl {
 	public:
-		/* Attempt to pack these.. We might also need flags for learnt, etc. */
+		/* XXX: Attempt to pack these.. We might also need flags for learnt, etc. */
 		uint32_t index;
 		uint16_t thread;
-		uint16_t size;
+		uint16_t size:15;
+		uint16_t learnt:1;
 		literal literals[0];
 
-		impl(uint16_t thread, uint32_t index, uint16_t size, const std::vector<literal> &v):
+		impl(uint16_t thread, uint32_t index, bool learnt, uint16_t size,
+			const std::vector<literal> &v):
 			index(index),
 			thread(thread),
-			size(size)
+			size(size),
+			learnt(learnt)
 		{
 			for (unsigned int i = 0; i < size; ++i)
 				literals[i] = v[i];
@@ -51,12 +54,12 @@ public:
 
 	impl *data;
 
-	clause():
-		data(0)
+	explicit clause(impl *data = 0):
+		data(data)
 	{
 	}
 
-	clause(unsigned int thread, unsigned int index, const std::vector<literal> &v)
+	clause(unsigned int thread, unsigned int index, bool learnt, const std::vector<literal> &v)
 	{
 		unsigned int size = v.size();
 		assert(size >= 1);
@@ -65,7 +68,7 @@ public:
 		if (!ptr)
 			throw system_error(errno);
 
-		data = new (ptr) impl(thread, index, size, v);
+		data = new (ptr) impl(thread, index, learnt, size, v);
 	}
 
 	template<typename... Args>
@@ -82,7 +85,7 @@ public:
 
 	/* For convenience. */
 	template<typename... Args>
-	clause(unsigned int thread, unsigned int index, Args... args)
+	clause(unsigned int thread, unsigned int index, bool learnt, Args... args)
 	{
 		std::vector<literal> v;
 
@@ -95,7 +98,7 @@ public:
 		if (!ptr)
 			throw system_error(errno);
 
-		data = new (ptr) impl(thread, index, size, v);
+		data = new (ptr) impl(thread, index, size, learnt, v);
 	}
 
 	void free()
@@ -121,6 +124,11 @@ public:
 	uint32_t index() const
 	{
 		return data->index;
+	}
+
+	bool is_learnt() const
+	{
+		return data->learnt;
 	}
 
 	uint32_t size() const

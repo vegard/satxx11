@@ -40,7 +40,7 @@ public:
 	void attach(Solver &s, clause c)
 	{
 		/* Never try to detach non-learnt clauses */
-		if (!s.is_learnt(c))
+		if (!c.is_learnt())
 			return;
 
 		/* Never try to detach short clauses */

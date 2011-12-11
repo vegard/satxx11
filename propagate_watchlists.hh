@@ -65,7 +65,7 @@ public:
 	literal conflict_literal;
 	clause conflict_reason;
 
-	propagate_watchlists(unsigned int nr_threads, unsigned int nr_variables, unsigned int nr_clauses):
+	propagate_watchlists(unsigned int nr_threads, unsigned int nr_variables):
 		nr_variables(nr_variables),
 		valuation(2 * nr_variables),
 		watchlists(new watchlist[2 * nr_variables]),

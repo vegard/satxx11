@@ -106,8 +106,7 @@ public:
 		} else {
 			conflict_clause.push_back(asserting_literal);
 
-			clause learnt_clause(s.id, s.clause_counter++, conflict_clause);
-
+			clause learnt_clause = s.allocate.allocate(s.nr_threads, s.id, true, conflict_clause);
 			debug("learnt = $", learnt_clause);
 
 			/* Automatically force the opposite polarity for the last
