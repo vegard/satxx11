@@ -32,6 +32,7 @@
 #include "print_stdio.hh"
 #include "propagate_watchlists.hh"
 #include "reduce_noop.hh"
+#include "reduce_size.hh"
 #include "restart_and.hh"
 #include "restart_fixed.hh"
 #include "restart_geometric.hh"
@@ -74,7 +75,7 @@ template<class Random = std::ranlux24_base,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
-	class Reduce = reduce_noop,
+	class Reduce = reduce_size,
 	class Print = print_stdio>
 class solver {
 public:
