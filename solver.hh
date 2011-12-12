@@ -168,17 +168,22 @@ public:
 		delete[] output;
 	}
 
-	void attach(clause c)
+	bool attach(clause c) __attribute__ ((warn_unused_result))
 	{
-		propagate.attach(c);
+		if (!propagate.attach(c))
+			return false;
+		if (!propagate.propagate())
+			return false;
+
 		decide.attach(c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
+		return true;
 	}
 
-	void attach(clause c, watch_indices w)
+	void attach_with_watches(clause c, unsigned int i, unsigned int j)
 	{
-		propagate.attach(c, w);
+		propagate.attach_with_watches(c, i, j);
 		decide.attach(c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
@@ -246,6 +251,13 @@ public:
 	{
 		backtrack(0);
 
+		for (clause c: pending_clauses) {
+			if (!attach(c))
+				return false;
+		}
+
+		pending_clauses.clear();
+
 		/* XXX: This might change if/when we figure out that we
 		 * want to and can attach clauses at other times than a
 		 * full restart. */
@@ -258,11 +270,6 @@ public:
 
 		if (!propagate.propagate())
 			return false;
-
-		for (clause c: pending_clauses)
-			attach(c);
-
-		pending_clauses.clear();
 
 		return true;
 	}
@@ -317,7 +324,6 @@ public:
 
 	void run(const std::vector<literal> &literals, const std::vector<clause> &clauses)
 	{
-		printf("c Thread %u started\n", id);
 		debug_thread_id = id;
 
 		/* XXX: We currently attach clauses before propagating unit
@@ -326,17 +332,31 @@ public:
 		 * handle this in attach()). */
 
 		/* Attach all clauses in the original instance */
-		for (clause c: clauses)
-			attach(c);
+		for (clause c: clauses) {
+			if (!attach(c)) {
+				unsat();
+				break;
+			}
+		}
+
+		if (should_exit)
+			return;
 
 		/* Queue unit clauses */
 		for (literal l: literals) {
-			if (!propagate.implication(l, clause()))
+			if (!propagate.implication(l, clause())) {
 				unsat();
+				break;
+			}
 		}
 
-		if (!should_exit && !propagate.propagate())
+		if (should_exit)
+			return;
+
+		if (!propagate.propagate())
 			unsat();
+
+		printf("c Thread %u starting\n", id);
 
 		while (!should_exit) {
 			/* This orders the writes to our outgoing messages with the atomic
@@ -431,7 +451,11 @@ public:
 					share(conflict_clause[0]);
 				} else {
 					clause learnt_clause = allocate.allocate(nr_threads, id, false, conflict_clause);
-					attach(learnt_clause);
+					if (!attach(learnt_clause)) {
+						should_exit = true;
+						break;
+					}
+
 					share(learnt_clause);
 				}
 

@@ -136,16 +136,14 @@ public:
 		valuation[2 * variable + 0] = false;
 	}
 
-	void attach(clause c, watch_indices w)
+	void attach_with_watches(clause c, unsigned int i, unsigned int j)
 	{
-		debug_enter("clause = $", c);
+		debug_enter("clause = $, i = $, j = $", c, i, j);
 
 		assert_hotpath(c.size() >= 2);
+		assert_hotpath(i != j);
 
-		assert_hotpath(w[0] != w[1]);
-		assert_hotpath(defined(c[w[0]]) && value(c[w[0]]));
-		assert_hotpath(defined(c[w[1]]) && !value(c[w[1]]));
-
+		watch_indices w(i, j);
 		watchlists[~c[w[0]]].insert(c);
 		watchlists[~c[w[1]]].insert(c);
 
@@ -155,12 +153,8 @@ public:
 		watches[c.thread()][c.index()] = w;
 	}
 
-	void attach(clause c)
+	void attach_true_and_undefined(clause c)
 	{
-		debug_enter("clause = $", c);
-
-		assert_hotpath(c.size() >= 2);
-
 		/* We can select undefined and true literals (if we select an
 		 * undefined one, we may visit it during propagation when it
 		 * becomes defined; if we select a satisfied literal, nothing
@@ -169,37 +163,104 @@ public:
 		 * here if we always select true literals that were defined
 		 * early in the decision stack, etc. since this makes it less
 		 * likely that we will follow a "stale" watch. */
-		watch_indices w;
 
 		unsigned int size = c.size();
 		for (unsigned int i = 0; i < size; ++i) {
 			if (defined(c[i]) && !value(c[i]))
 				continue;
 
-			w[0] = i;
-
 			for (unsigned int j = i + 1; j < size; ++j) {
 				if (defined(c[j]) && !value(c[j]))
 					continue;
 
-				w[1] = j;
-				break;
+				attach_with_watches(c, i, j);
+				return;
 			}
 
-			break;
+			assert(false);
 		}
 
-		assert_hotpath(w[0] != w[1]);
-		assert_hotpath(!defined(c[w[0]]) || value(c[w[0]]));
-		assert_hotpath(!defined(c[w[1]]) || value(c[w[1]]));
+		assert(false);
+	}
 
-		watchlists[~c[w[0]]].insert(c);
-		watchlists[~c[w[1]]].insert(c);
+	/* Attach a clause that may be in any state (partially or completely
+	 * satisfied or falsified). Returns false if and only if there was a
+	 * conflict. */
+	bool attach(clause c) __attribute__ ((warn_unused_result))
+	{
+		debug_enter("clause = $", c);
 
-		/* XXX: A bit ugly. Please fix. */
-		if (watches[c.thread()].size() <= c.index())
-			watches[c.thread()].resize(c.index() + 1);
-		watches[c.thread()][c.index()] = w;
+		assert_hotpath(c.size() >= 2);
+
+		watch_indices w;
+
+		/* This is an attempt at making a somewhat fast, one-pass search
+		 * for all kinds of literals. This function is typically called
+		 * for clauses received from other threads, and the clauses we
+		 * receive are typically long-ish, so we want it to be really
+		 * efficient. We try to cache one true literal, one undefined
+		 * literal, and up to two false literals, since this is all we
+		 * really need to know in the worst case. */
+		unsigned int found = 0;
+		unsigned int found_true;
+		unsigned int found_false[2];
+		unsigned int found_undefined;
+
+		unsigned int size = c.size();
+		for (unsigned int i = 0; i < size; ++i) {
+			if (defined(c[i])) {
+				if (value(c[i])) {
+					if (!(found & 1)) {
+						found |= 1;
+						found_true = i;
+					} else {
+						/* Found two true literals */
+						attach_with_watches(c, found_true, i);
+						return true;
+					}
+				} else {
+					if (!(found & 4)) {
+						found |= 4;
+						found_false[0] = i;
+					} else if (!(found & 8)) {
+						found |= 8;
+						found_false[1] = i;
+					}
+				}
+			} else {
+				if (!(found & 16)) {
+					found |= 16;
+					found_undefined = i;
+				} else if (found & 1) {
+					/* We have one true and one undefined literal */
+					attach_with_watches(c, found_true, found_undefined);
+					return true;
+				} else {
+					/* Found two undefined literals */
+					attach_with_watches(c, found_undefined, i);
+					return true;
+				}
+			}
+		}
+
+		if (found & 1) {
+			/* We found only one true literal. */
+			if (found & 16) {
+				attach_with_watches(c, found_true, found_undefined);
+				return true;
+			} else if (found & 4) {
+				attach_with_watches(c, found_true, found_false[0]);
+				return true;
+			}
+		} else {
+			assert(found & 16);
+			/* No true literal! This means one of the undefined ones must be implied. */
+			/* XXX: implication() assumes the literal may be defined or undefined. From
+			 * this particular callsite it is always undefined, so we could optimize it. */
+			return implication(c[found_undefined], c);
+		}
+
+		assert(false);
 	}
 
 	void detach(clause c)
