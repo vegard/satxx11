@@ -45,7 +45,7 @@ public:
 	}
 
 	template<class Solver>
-	void backtrack(Solver &s, literal lit)
+	void backtrack(Solver &s, unsigned int decision)
 	{
 	}
 };
