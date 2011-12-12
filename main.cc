@@ -128,6 +128,12 @@ static void solve(t *s, const std::vector<literal> &literals, const std::vector<
 
 int main(int argc, char *argv[])
 {
+	struct timeval time_start;
+	{
+		int err = gettimeofday(&time_start, NULL);
+		assert(err == 0);
+	}
+
 	/* Don't buffer stdout/stderr. This REALLY helps for debugging
 	 * as it also makes sure that messages from the solver and e.g.
 	 * valgrind appear in the right order. */
@@ -278,6 +284,17 @@ int main(int argc, char *argv[])
 		assert(err == 0);
 
 		printf("c CPU user time %lu.%06lu\n", usage.ru_utime.tv_sec, usage.ru_utime.tv_usec);
+	}
+
+	{
+		struct timeval time_stop;
+		int err = gettimeofday(&time_stop, NULL);
+		assert(err == 0);
+
+		struct timeval delta;
+		timersub(&time_stop, &time_start, &delta);
+
+		printf("c Wall time %lu.%06lu\n", delta.tv_sec, delta.tv_usec);
 	}
 
 	return 0;
