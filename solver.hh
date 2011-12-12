@@ -32,6 +32,7 @@
 #include "print_noop.hh"
 #include "print_stdio.hh"
 #include "propagate_watchlists.hh"
+#include "receive_all.hh"
 #include "reduce_noop.hh"
 #include "reduce_size.hh"
 #include "restart_and.hh"
@@ -77,6 +78,7 @@ template<class Random = std::ranlux24_base,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Send = send_size<4>,
+	class Receive = receive_all,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
 	class Reduce = reduce_size,
 	class Print = print_stdio>
@@ -124,6 +126,7 @@ public:
 	Propagate propagate;
 	Analyze analyze;
 	Send send;
+	Receive receive;
 	Restart restart;
 	Reduce reduce;
 	Print print;
@@ -157,6 +160,7 @@ public:
 		propagate(nr_threads, variables.size()),
 		analyze(*this),
 		send(*this),
+		receive(*this),
 		reduce(*this),
 		print(*this)
 	{
@@ -181,6 +185,7 @@ public:
 
 		decide.attach(c);
 		send.attach(*this, c);
+		receive.attach(*this, c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
 		return true;
@@ -191,6 +196,7 @@ public:
 		propagate.attach_with_watches(c, i, j);
 		decide.attach(c);
 		send.attach(*this, c);
+		receive.attach(*this, c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
 	}
@@ -200,6 +206,7 @@ public:
 		propagate.detach(c);
 		decide.detach(c);
 		send.detach(*this, c);
+		receive.detach(*this, c);
 		reduce.detach(*this, c);
 		print.detach(*this, c);
 
@@ -403,11 +410,28 @@ public:
 			if (m) {
 				/* Process message */
 
-				for (literal l: m->learnt_literals)
-					pending_literals.push_back(l);
+				for (literal l: m->learnt_literals) {
+					if (!receive(*this, l))
+						continue;
 
-				for (clause c: m->learnt_clauses)
+					pending_literals.push_back(l);
+				}
+
+				for (clause c: m->learnt_clauses) {
+					if (!receive(*this, c)) {
+						/* Reject the clause by not attaching it in
+						 * the first place, but letting the owning
+						 * thread know that we don't want to use it. */
+						unsigned int thread = c.thread();
+
+						assert_hotpath(thread != id);
+						output[thread]->detached_clauses.push_back(c.index());
+						output[thread]->empty = false;
+						continue;
+					}
+
 					pending_clauses.push_back(c);
+				}
 
 				/* Decrement reference counts for detached clauses */
 				for (unsigned int id: m->detached_clauses)
