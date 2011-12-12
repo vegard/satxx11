@@ -41,6 +41,7 @@
 #include "restart_nested.hh"
 #include "restart_not.hh"
 #include "restart_or.hh"
+#include "send_size.hh"
 
 /* Workaround for missing implementation in libstdc++ for gcc 4.6. */
 namespace std {
@@ -75,6 +76,7 @@ template<class Random = std::ranlux24_base,
 	class Decide = decide_vsids,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
+	class Send = send_size<4>,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
 	class Reduce = reduce_size,
 	class Print = print_stdio>
@@ -121,6 +123,7 @@ public:
 	Decide decide;
 	Propagate propagate;
 	Analyze analyze;
+	Send send;
 	Restart restart;
 	Reduce reduce;
 	Print print;
@@ -153,6 +156,7 @@ public:
 		decide(*this),
 		propagate(nr_threads, variables.size()),
 		analyze(*this),
+		send(*this),
 		reduce(*this),
 		print(*this)
 	{
@@ -176,6 +180,7 @@ public:
 			return false;
 
 		decide.attach(c);
+		send.attach(*this, c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
 		return true;
@@ -185,6 +190,7 @@ public:
 	{
 		propagate.attach_with_watches(c, i, j);
 		decide.attach(c);
+		send.attach(*this, c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
 	}
@@ -193,6 +199,7 @@ public:
 	{
 		propagate.detach(c);
 		decide.detach(c);
+		send.detach(*this, c);
 		reduce.detach(*this, c);
 		print.detach(*this, c);
 
@@ -213,6 +220,9 @@ public:
 
 	void share(literal l)
 	{
+		if (!send(*this, l))
+			return;
+
 		for (unsigned int i = 0; i < nr_threads; ++i) {
 			if (i == id)
 				continue;
@@ -224,6 +234,9 @@ public:
 
 	void share(clause c)
 	{
+		if (!send(*this, c))
+			return;
+
 		for (unsigned int i = 0; i < nr_threads; ++i) {
 			if (i == id)
 				continue;
