@@ -313,13 +313,13 @@ public:
 		}
 
 		printf("v %s 0\n", ss.str().c_str());
-		printf("c SATISFIABLE\n");
+		printf("s SATISFIABLE\n");
 	}
 
 	void unsat()
 	{
 		should_exit = true;
-		printf("c UNSATISFIABLE\n");
+		printf("s UNSATISFIABLE\n");
 	}
 
 	void run(const std::vector<literal> &literals, const std::vector<clause> &clauses)
