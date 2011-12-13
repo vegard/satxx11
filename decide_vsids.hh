@@ -154,12 +154,17 @@ public:
 		percolate_up(positions[l]);
 	}
 
-	void attach(clause c)
+	template<class Solver>
+	void resolve(Solver &s, clause c)
 	{
 		debug_enter("clause = $", c);
 
 		for (unsigned int i = 0, n = c.size(); i < n; ++i)
 			bump(c[i]);
+	}
+
+	void attach(clause c)
+	{
 	}
 
 	void detach(clause c)

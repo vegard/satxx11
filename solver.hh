@@ -259,6 +259,12 @@ public:
 		print.decision(*this, lit);
 	}
 
+	/* XXX: We would also like to know what we are resolving _with_... */
+	void resolve(clause c)
+	{
+		decide.resolve(*this, c);
+	}
+
 	void backtrack(unsigned int decision)
 	{
 		propagate.backtrack(decision);

@@ -55,6 +55,12 @@ public:
 			assert(reason);
 			debug("reason = $", reason);
 
+			/* Generic hook -- but our main intention is to let
+			 * the VSIDS heuristic bump the clause activity */
+			/* XXX: Ideally, we would also pass some information
+			 * like what it is resolved _with_... */
+			s.resolve(reason);
+
 			for (unsigned int i = 0; i < reason.size(); ++i) {
 				literal lit = reason[i];
 				unsigned int variable = lit.variable();
