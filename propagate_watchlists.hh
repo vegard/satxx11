@@ -199,11 +199,11 @@ public:
 		 * for clauses received from other threads, and the clauses we
 		 * receive are typically long-ish, so we want it to be really
 		 * efficient. We try to cache one true literal, one undefined
-		 * literal, and up to two false literals, since this is all we
-		 * really need to know in the worst case. */
-		unsigned int found = 0;
+		 * literal, and one false literal, since this is all we really
+		 * need to know in the worst case. */
+		uint8_t found = 0;
 		unsigned int found_true;
-		unsigned int found_false[2];
+		unsigned int found_false;
 		unsigned int found_undefined;
 
 		unsigned int size = c.size();
@@ -219,17 +219,14 @@ public:
 						return true;
 					}
 				} else {
-					if (!(found & 4)) {
-						found |= 4;
-						found_false[0] = i;
-					} else if (!(found & 8)) {
-						found |= 8;
-						found_false[1] = i;
+					if (!(found & 2)) {
+						found |= 2;
+						found_false = i;
 					}
 				}
 			} else {
-				if (!(found & 16)) {
-					found |= 16;
+				if (!(found & 4)) {
+					found |= 4;
 					found_undefined = i;
 				} else if (found & 1) {
 					/* We have one true and one undefined literal */
@@ -245,15 +242,15 @@ public:
 
 		if (found & 1) {
 			/* We found only one true literal. */
-			if (found & 16) {
+			if (found & 4) {
 				attach_with_watches(c, found_true, found_undefined);
 				return true;
-			} else if (found & 4) {
-				attach_with_watches(c, found_true, found_false[0]);
+			} else if (found & 2) {
+				attach_with_watches(c, found_true, found_false);
 				return true;
 			}
 		} else {
-			assert(found & 16);
+			assert(found & 4);
 			/* No true literal! This means one of the undefined ones must be implied. */
 			/* XXX: implication() assumes the literal may be defined or undefined. From
 			 * this particular callsite it is always undefined, so we could optimize it. */
