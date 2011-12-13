@@ -102,7 +102,7 @@ public:
 		literal x = heap[i];
 		unsigned int p = parent(i);
 
-		while (i > 0 && activities[x] < activities[heap[p]]) {
+		while (i > 0 && activities[x] > activities[heap[p]]) {
 			heap[i] = heap[p];
 			positions[heap[p]] = i;
 			i = p;
@@ -134,7 +134,7 @@ public:
 			else
 				child = l;
 
-			if (activities[heap[child]] <= activities[x])
+			if (activities[x] >= activities[heap[child]])
 				break;
 
 			heap[i] = heap[child];
@@ -157,14 +157,14 @@ public:
 	template<class Solver>
 	void resolve(Solver &s, clause c)
 	{
-		debug_enter("clause = $", c);
-
 		for (unsigned int i = 0, n = c.size(); i < n; ++i)
 			bump(c[i]);
 	}
 
 	void attach(clause c)
 	{
+		for (unsigned int i = 0, n = c.size(); i < n; ++i)
+			bump(c[i]);
 	}
 
 	void detach(clause c)
