@@ -6,9 +6,8 @@ using C++ templates and readable, well-documented code. It also makes
 extensive use of the new features in C++11 (hence the name).
 
 NOTE: The solver currently works, but is far from efficient. This is due
-to the fact that it is not finished; clause cleaning, for example, is not
-implemented, meaning that the clause database will just grow without
-bounds. It can solve small/simple instances, though.
+to the fact that it is not finished; it can solve small/simple instances,
+though.
 
 This code is licensed under GPL3; see the file COPYING for the complete
 license.
