@@ -55,6 +55,11 @@ public:
 	{
 	}
 
+	template<class Solver>
+	void resolve(Solver &s, clause c)
+	{
+	}
+
 	struct clause_compare {
 		bool operator()(clause a, clause b)
 		{

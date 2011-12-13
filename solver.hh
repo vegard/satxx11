@@ -263,6 +263,7 @@ public:
 	void resolve(clause c)
 	{
 		decide.resolve(*this, c);
+		reduce.resolve(*this, c);
 	}
 
 	void backtrack(unsigned int decision)
