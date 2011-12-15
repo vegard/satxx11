@@ -41,6 +41,9 @@ extern "C" {
 #include "literal.hh"
 #include "solver.hh"
 
+#include "git_diff.hh"
+#include "git_diff_cached.hh"
+
 typedef unsigned int variable;
 typedef std::map<variable, variable> variable_map;
 typedef std::vector<literal> literal_vector;
@@ -175,6 +178,8 @@ int main(int argc, char *argv[])
 		options_description debug_options("Debugging options");
 		debug_options.add_options()
 			("debug-sizes", "Dump the sizes of various data structures")
+			("debug-diff", "Dump the local changes (if any) that the binary was built with")
+			("debug-diff-cached", "Dump the local staged changes (if any) that the binary was built with")
 		;
 
 		options_description all_options;
@@ -215,8 +220,22 @@ int main(int argc, char *argv[])
 			printf("c sizeof(watchlist) = %lu\n", sizeof(watchlist));
 			return 0;
 		}
+
+		if (map.count("debug-diff")) {
+			printf("%s", git_diff);
+			return 0;
+		}
+
+		if (map.count("debug-diff-cached")) {
+			printf("%s", git_diff_cached);
+			return 0;
+		}
 	}
 
+	bool modified = strcmp("", git_diff) || strcmp("", git_diff_cached);
+
+	printf("c SAT++11 (A.K.A. satxx11) compiled from git revision %s%s\n",
+		GIT_REVISION, modified ? "-dirty" : "");
 	printf("c Using random number seed %llu\n", seed);
 
 	/* Read instance */
