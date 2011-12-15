@@ -379,6 +379,20 @@ public:
 		debug("watchlist size = $", n);
 
 		for (unsigned int i = 0; i < n;) {
+			/* XXX: Make the prefetch distance configurable. */
+			/* We tested baseline (138s), +4 (121s), +5 (110s),
+			 * and +6 (112s). */
+			if (i + 5 < n)
+				__builtin_prefetch(w[i + 5].data, 0);
+
+			/* XXX: Make the prefetch distance configurable. */
+			/* We tested baseline (162s), +1 (148s), +2 (138s),
+			 * +3 (136s), +4 (136s), +5 (140s). Supplying an
+			 * argument of 1 for the rw parameter made it worse
+			 * by 2-10s. */
+			if (i + 3 < n)
+				__builtin_prefetch(&watches[w[i + 3].thread()][w[i + 3].index()], 0);
+
 			assert_hotpath(i < w.size());
 
 			clause c = w[i];
