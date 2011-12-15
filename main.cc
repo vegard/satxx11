@@ -141,12 +141,20 @@ int main(int argc, char *argv[])
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	unsigned int nr_threads = 1;
-
-	/* Get the number of "enabled CPUs" from the kernel */
 	{
+		/* Get the number of "enabled CPUs" from the kernel */
 		int nprocs = get_nprocs();
 		if (nprocs >= 1)
 			nr_threads = nprocs;
+	}
+
+	unsigned long seed;
+	{
+		struct timeval tv;
+		int err = gettimeofday(&tv, NULL);
+		assert(!err);
+
+		seed = tv.tv_sec * 1000000 + tv.tv_usec;
 	}
 
 	std::vector<std::string> input_files;
@@ -160,6 +168,7 @@ int main(int argc, char *argv[])
 			("help", "Display this information")
 			("keep-going", value<bool>(&keep_going)->zero_tokens(), "find all solutions")
 			("threads", value<unsigned int>(&nr_threads), "number of threads")
+			("seed", value<unsigned long>(&seed), "random number seed")
 			("input", value<std::vector<std::string> >(&input_files), "input file")
 		;
 
@@ -192,6 +201,11 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
+		if (map.count("seed") > 1) {
+			std::cerr << all_options;
+			return 1;
+		}
+
 		if (map.count("debug-sizes")) {
 			printf("c sizeof(clause) = %lu\n", sizeof(clause));
 			printf("c sizeof(clause::impl) = %lu\n", sizeof(clause::impl));
@@ -202,6 +216,8 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 	}
+
+	printf("c Using random number seed %llu\n", seed);
 
 	/* Read instance */
 	variable_map variables;
@@ -238,15 +254,6 @@ int main(int argc, char *argv[])
 
 	/* XXX: Make all the stuff below RAII (we currently don't clean up
 	 * if anything bad happens = an exception is thrown). */
-
-	unsigned long seed;
-	{
-		struct timeval tv;
-		int err = gettimeofday(&tv, NULL);
-		assert(!err);
-
-		seed = tv.tv_sec * 1000000 + tv.tv_usec;
-	}
 
 	/* Construct the solvers */
 	/* XXX: It would be nice if we could make an array of solvers instead of
