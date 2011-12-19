@@ -19,17 +19,30 @@
 #ifndef PRINT_STDIO_HH
 #define PRINT_STDIO_HH
 
+#include <limits>
+
 #include "clause.hh"
 #include "literal.hh"
 
 class print_stdio {
 public:
-	unsigned int nr_learnt_clauses;
-	unsigned int nr_learnt_literals;
-	unsigned int nr_decisions;
-	double avg_backtrack_level;
-	double avg_clause_length;
 	unsigned int nr_restarts;
+
+	unsigned int nr_learnt_clauses_attached;
+	unsigned int nr_learnt_clauses_detached;
+	unsigned int nr_decisions;
+
+	double avg_backtrack_level;
+	unsigned int min_backtrack_level;
+	unsigned int max_backtrack_level;
+
+	double avg_clause_length;
+	unsigned int min_clause_length;
+	unsigned int max_clause_length;
+
+	unsigned int nr_clause_1;
+	unsigned int nr_clause_2;
+	unsigned int nr_clause_3;
 
 	void header()
 	{
@@ -37,41 +50,85 @@ public:
 		printf("c  Thread number\n");
 		printf("c  |    Number of restarts\n");
 		printf("c  |    |   Number of decisions\n");
-		printf("c  |    |      |      Number of learnt clauses\n");
-		printf("c  |    |      |      |        Number of literals in learnt clauses\n");
-		printf("c  |    |      |      |        |      Average backtrack level\n");
-		printf("c  |    |      |      |        |      |      Average clause length\n");
-		printf("c  |    |      |      |        |      |      |\n");
+		printf("c  |    |      |           Number of learnt clauses (attached/detached)\n");
+		printf("c  |    |      |           |              Backtrack level (min/avg/max)\n");
+		printf("c  |    |      |           |              |            Clause length (min/avg/max)\n");
+		printf("c  |    |      |           |              |            |         Number of learnt clauses (size 1/2/3)\n");
+		printf("c  |    |      |           |              |            |         |\n");
 	}
 
 	template<class Solver>
 	print_stdio(Solver &s):
-		nr_learnt_clauses(0),
-		nr_learnt_literals(0),
-		nr_decisions(0),
-		avg_backtrack_level(0),
-		avg_clause_length(0),
-		nr_restarts(0)
+		nr_restarts(0),
+		nr_clause_1(0),
+		nr_clause_2(0),
+		nr_clause_3(0)
 	{
+		init();
+
 		if (s.id == 0)
 			header();
+	}
+
+	void init()
+	{
+		nr_learnt_clauses_attached = 0;
+		nr_learnt_clauses_detached = 0;
+		nr_decisions = 0,
+
+		avg_backtrack_level = 0;
+		min_backtrack_level = std::numeric_limits<unsigned int>::max();
+		max_backtrack_level = std::numeric_limits<unsigned int>::min();
+
+		avg_clause_length = 0;
+		min_clause_length = std::numeric_limits<unsigned int>::max();
+		max_clause_length = std::numeric_limits<unsigned int>::min();
+	}
+
+	void attach(unsigned int n)
+	{
+		++nr_learnt_clauses_attached;
+
+		static const double alpha = 0.995;
+		avg_clause_length = alpha * avg_clause_length + (1 - alpha) * n;
+
+		if (n < min_clause_length)
+			min_clause_length = n;
+		if (n > max_clause_length)
+			max_clause_length = n;
+	}
+
+	template<class Solver>
+	void attach(Solver &s, literal l)
+	{
+		attach(1);
+
+		/* XXX: We don't strictly know if it was learnt or not... */
+		++nr_clause_1;
 	}
 
 	template<class Solver>
 	void attach(Solver &s, clause c)
 	{
-		nr_learnt_clauses += 1;
-		nr_learnt_literals += c.size();
+		if (!c.is_learnt())
+			return;
 
-		static const double alpha = 0.995;
-		avg_clause_length = alpha * avg_clause_length + (1 - alpha) * c.size();
+		unsigned int n = c.size();
+		attach(n);
+
+		if (n == 2)
+			++nr_clause_2;
+		if (n == 3)
+			++nr_clause_3;
 	}
 
 	template<class Solver>
 	void detach(Solver &s, clause c)
 	{
-		nr_learnt_clauses -= 1;
-		nr_learnt_literals -= c.size();
+		if (!c.is_learnt())
+			return;
+
+		++nr_learnt_clauses_detached;
 	}
 
 	template<class Solver>
@@ -90,16 +147,25 @@ public:
 		if (decision == 0) {
 			nr_restarts += 1;
 
-			if (s.id == 0 && nr_restarts % 10 == 0) {
+			if (s.id == 0 && nr_restarts % std::max<unsigned int>(1, 20 / s.nr_threads) == 0) {
 				printf("c\n");
 				header();
 			}
 
-			printf("c %2u: %3u %6u %6u %8u %6.2f %6.2f\n",
+			printf("c %2u: %3u %6u %6u/%-6u %3u/%.2f/%-3u %2u/%.2f/%-3u %2u/%2u/%2u\n",
 				s.id,
 				nr_restarts, nr_decisions,
-				nr_learnt_clauses, nr_learnt_literals,
-				avg_backtrack_level, avg_clause_length);
+				nr_learnt_clauses_attached, nr_learnt_clauses_detached,
+				min_backtrack_level, avg_backtrack_level, max_backtrack_level,
+				min_clause_length, avg_clause_length, max_clause_length,
+				nr_clause_1, nr_clause_2, nr_clause_3);
+
+			init();
+		} else {
+			if (decision < min_backtrack_level)
+				min_backtrack_level = decision;
+			if (decision > max_backtrack_level)
+				max_backtrack_level = decision;
 		}
 	}
 };

@@ -108,6 +108,7 @@ public:
 			bool ret = p.implication(s, asserting_literal, clause());
 			assert(ret);
 
+			s.attach(asserting_literal);
 			s.share(asserting_literal);
 		} else {
 			conflict_clause.push_back(asserting_literal);

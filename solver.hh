@@ -195,6 +195,11 @@ public:
 		decide.unassign(*this, variable);
 	}
 
+	void attach(literal l)
+	{
+		print.attach(*this, l);
+	}
+
 	bool attach(clause c) __attribute__ ((warn_unused_result))
 	{
 		if (!propagate.attach(*this, c))
@@ -310,6 +315,8 @@ public:
 		for (literal l: pending_literals) {
 			if (!propagate.implication(*this, l, clause()))
 				return false;
+
+			attach(l);
 		}
 
 		pending_literals.clear();
