@@ -236,7 +236,7 @@ int main(int argc, char *argv[])
 
 	printf("c SAT++11 (A.K.A. satxx11) compiled from git revision %s%s\n",
 		GIT_REVISION, modified ? "-dirty" : "");
-	printf("c Using random number seed %llu\n", seed);
+	printf("c Using random number seed %lu\n", seed);
 
 	/* Read instance */
 	variable_map variables;
