@@ -25,8 +25,9 @@
 #include "clause.hh"
 
 /* Detach clauses based on their size (similar to minisat 2.2.0 heuristic);
- * all clauses of size 2 are kept and approximately half of all other learnt
- * clauses are kept. */
+ * all clauses smaller than a certain size are kept and approximately half
+ * of all other learnt clauses are kept. */
+template<unsigned int size>
 class reduce_size {
 public:
 	std::vector<clause> clauses;
@@ -44,7 +45,7 @@ public:
 			return;
 
 		/* Never try to detach short clauses */
-		if (c.size() <= 2)
+		if (c.size() <= size)
 			return;
 
 		clauses.push_back(c);
@@ -63,10 +64,7 @@ public:
 	struct clause_compare {
 		bool operator()(clause a, clause b)
 		{
-			if (a.size() < b.size())
-				return true;
-
-			return false;
+			return a.size() < b.size();
 		}
 	};
 

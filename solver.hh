@@ -82,7 +82,7 @@ template<class Random = std::ranlux24_base,
 	class Send = send_size<4>,
 	class Receive = receive_all,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
-	class Reduce = reduce_size,
+	class Reduce = reduce_size<2>,
 	class Print = print_stdio>
 class solver {
 public:
