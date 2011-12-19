@@ -45,6 +45,7 @@
 #include "restart_not.hh"
 #include "restart_or.hh"
 #include "send_size.hh"
+#include "simplify_list.hh"
 
 /* Workaround for missing implementation in libstdc++ for gcc 4.6. */
 namespace std {
@@ -83,6 +84,7 @@ template<class Random = std::ranlux24_base,
 	class Receive = receive_all,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
 	class Reduce = reduce_size<2>,
+	class Simplify = simplify_list<>,
 	class Print = print_stdio>
 class solver {
 public:
@@ -131,6 +133,7 @@ public:
 	Receive receive;
 	Restart restart;
 	Reduce reduce;
+	Simplify simplify;
 	Print print;
 
 	solver(unsigned int nr_threads,
