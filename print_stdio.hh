@@ -152,7 +152,7 @@ public:
 				header();
 			}
 
-			printf("c %2u: %3u %6u %6u/%-6u %3u/%.2f/%-3u %2u/%.2f/%-3u %2u/%2u/%2u\n",
+			printf("c %2u: %3u %6u %6u/%-6u %3u/%06.2f/%-3u %2u/%06.2f/%-3u %2u/%2u/%2u\n",
 				s.id,
 				nr_restarts, nr_decisions,
 				nr_learnt_clauses_attached, nr_learnt_clauses_detached,
