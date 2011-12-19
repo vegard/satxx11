@@ -76,7 +76,7 @@ typedef std::vector<literal> literal_vector;
 typedef std::vector<literal_vector> literal_vector_vector;
 
 template<class Random = std::ranlux24_base,
-	class Decide = decide_cached_polarity<decide_vsids>,
+	class Decide = decide_cached_polarity<decide_vsids<95>>,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Send = send_size<4>,
@@ -288,6 +288,11 @@ public:
 	{
 		decide.resolve(*this, c);
 		reduce.resolve(*this, c);
+	}
+
+	void conflict()
+	{
+		decide.conflict(*this);
 	}
 
 	void backtrack(unsigned int decision)
@@ -534,6 +539,8 @@ public:
 
 			decision(decide(*this, propagate));
 			while (!propagate.propagate(*this) && !should_exit) {
+				conflict();
+
 				if (propagate.decision_index == 0) {
 					/* A conflict at decision level 0 means the instance
 					 * is unsat. */

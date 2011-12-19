@@ -72,6 +72,12 @@ public:
 		x.detach(c);
 	}
 
+	template<class Solver>
+	void conflict(Solver &s)
+	{
+		x.conflict(s);
+	}
+
 	template<class Solver, class Propagate>
 	literal operator()(Solver &s, Propagate &p)
 	{

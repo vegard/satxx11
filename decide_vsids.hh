@@ -48,6 +48,7 @@
 #include "clause.hh"
 #include "literal.hh"
 
+template<unsigned int var_decay>
 class decide_vsids {
 public:
 	unsigned int size;
@@ -55,8 +56,10 @@ public:
 
 	/* Indexed by variable */
 	std::vector<bool> contained;
-	std::vector<unsigned int> activities;
+	std::vector<double> activities;
 	std::vector<unsigned int> positions;
+
+	double var_inc;
 
 	template<class Solver>
 	decide_vsids(Solver &s):
@@ -64,7 +67,8 @@ public:
 		heap(s.nr_variables),
 		contained(s.nr_variables),
 		activities(s.nr_variables),
-		positions(s.nr_variables)
+		positions(s.nr_variables),
+		var_inc(1)
 	{
 		for (unsigned int i = 0; i < s.nr_variables; ++i) {
 			heap[i] = i;
@@ -152,8 +156,15 @@ public:
 	{
 		debug_enter("variable = $", var);
 
+		activities[var] += var_inc;
+		if (activities[var] > 1e100) {
+			for (unsigned int i = 0, n = activities.size(); i < n; ++i)
+				activities[i] *= 1e-100;
+
+			var_inc *= 1e-100;
+		}
+
 		if (contained[var]) {
-			++activities[var];
 			percolate_up(positions[var]);
 		} else {
 			unsigned int i = size++;
@@ -206,6 +217,12 @@ public:
 
 	void detach(clause c)
 	{
+	}
+
+	template<class Solver>
+	void conflict(Solver &s)
+	{
+		var_inc *= 1 / (var_decay / 100.);
 	}
 
 	template<class Solver, class Propagate>
