@@ -120,13 +120,6 @@ public:
 		valuation[2 * variable + 1] = value;
 	}
 
-	void assign(literal l, bool value)
-	{
-		debug_enter("literal = $, value = $", l, value);
-
-		assign(l.variable(), l.value() == value);
-	}
-
 	void unassign(unsigned int variable)
 	{
 		debug_enter("variable = $", variable);
@@ -186,7 +179,8 @@ public:
 	/* Attach a clause that may be in any state (partially or completely
 	 * satisfied or falsified). Returns false if and only if there was a
 	 * conflict. */
-	bool attach(clause c) __attribute__ ((warn_unused_result))
+	template<class Solver>
+	bool attach(Solver &s, clause c) /* XXX: __attribute__ ((warn_unused_result)) */
 	{
 		debug_enter("clause = $", c);
 
@@ -254,7 +248,7 @@ public:
 			/* No true literal! This means one of the undefined ones must be implied. */
 			/* XXX: implication() assumes the literal may be defined or undefined. From
 			 * this particular callsite it is always undefined, so we could optimize it. */
-			return implication(c[found_undefined], c);
+			return implication(s, c[found_undefined], c);
 		}
 
 		assert(false);
@@ -269,14 +263,15 @@ public:
 		watchlists[~c[w[1]]].remove(c);
 	}
 
-	void decision(literal lit)
+	template<class Solver>
+	void decision(Solver &s, literal lit)
 	{
 		debug_enter("literal = $", lit);
 
 		assert_hotpath(!defined(lit));
 
 		unsigned int variable = lit.variable();
-		assign(lit, true);
+		s.assign(lit, true);
 		trail[trail_index] = variable;
 		decisions[decision_index] = trail_index;
 		++trail_index;
@@ -289,13 +284,16 @@ public:
 	/* Called whenever a variable is forced to a particular value. The
 	 * variable may be defined already, in which case we have a conflict
 	 * and this function will return false. */
-	bool implication(literal lit, clause reason)
+	template<class Solver>
+	bool implication(Solver &s, literal lit, clause reason)
 	{
 		debug_enter("literal = $", lit);
 
 		if (defined(lit)) {
 			/* If it's already defined to have the right value,
 			 * we don't have a conflict. */
+			/* XXX: In this case, Minisat changes reasons[variable]
+			 * if the new reason is a smaller clause. */
 			if (value(lit))
 				return debug_return(true, "$ /* no conflict; already defined */");
 
@@ -305,7 +303,7 @@ public:
 		}
 
 		unsigned int variable = lit.variable();
-		assign(lit, true);
+		s.assign(lit, true);
 		trail[trail_index] = variable;
 		++trail_index;
 		reasons[variable] = reason;
@@ -315,7 +313,8 @@ public:
 	}
 
 	/* Return false if and only if there was a conflict. */
-	bool find_new_watch(clause c, unsigned int watch, bool &replace)
+	template<class Solver>
+	bool find_new_watch(Solver &s, clause c, unsigned int watch, bool &replace)
 	{
 		debug_enter("clause = $", c);
 
@@ -358,11 +357,12 @@ public:
 		/* There was no other watch to replace the one we just
 		 * falsified; therefore, the other watched literal must
 		 * be satisfied (this is the implication). */
-		return debug_return(implication(c[wi[!watch]], c), "$");
+		return debug_return(implication(s, c[wi[!watch]], c), "$");
 	}
 
 	/* Return false if and only if there was a conflict. */
-	bool propagate(literal lit)
+	template<class Solver>
+	bool propagate(Solver &s, literal lit)
 	{
 		debug_enter("literal = $", lit);
 
@@ -402,7 +402,7 @@ public:
 			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));
 
 			bool replace = false;
-			if (!find_new_watch(c, c[wi[1]] == ~lit, replace))
+			if (!find_new_watch(s, c, c[wi[1]] == ~lit, replace))
 				return debug_return(false, "$");
 
 			if (replace) {
@@ -417,7 +417,8 @@ public:
 	}
 
 	/* Return false if and only if there was a conflict. */
-	bool propagate()
+	template<class Solver>
+	bool propagate(Solver &s)
 	{
 		debug_enter("");
 
@@ -427,14 +428,15 @@ public:
 
 			/* If propagation caused a conflict, abort the rest
 			 * of the conflicts as well. */
-			if (!propagate(lit))
+			if (!propagate(s, lit))
 				return debug_return(false, "$");
 		}
 
 		return debug_return(true, "$");
 	}
 
-	void backtrack(unsigned int decision)
+	template<class Solver>
+	void backtrack(Solver &s, unsigned int decision)
 	{
 		debug_enter("decision = $", decision);
 
@@ -446,7 +448,7 @@ public:
 		debug("new trail index = $", new_trail_index);
 
 		for (unsigned int i = trail_index; i-- > new_trail_index; )
-			unassign(trail[i]);
+			s.unassign(trail[i]);
 
 		trail_index = new_trail_index;
 		decision_index = decision;

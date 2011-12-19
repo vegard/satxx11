@@ -50,30 +50,32 @@
 
 class decide_vsids {
 public:
-	std::vector<literal> heap;
+	unsigned int size;
+	std::vector<unsigned int> heap;
 
-	/* Indexed by literal */
+	/* Indexed by variable */
+	std::vector<bool> contained;
 	std::vector<unsigned int> activities;
 	std::vector<unsigned int> positions;
 
 	template<class Solver>
 	decide_vsids(Solver &s):
-		heap(2 * s.nr_variables),
-		activities(2 * s.nr_variables),
-		positions(2 * s.nr_variables)
+		size(s.nr_variables),
+		heap(s.nr_variables),
+		contained(s.nr_variables),
+		activities(s.nr_variables),
+		positions(s.nr_variables)
 	{
 		for (unsigned int i = 0; i < s.nr_variables; ++i) {
-			for (bool v: {false, true}) {
-				literal l(i, v);
-				heap[l] = l;
-				activities[l] = 0;
-				positions[l] = l;
-			}
+			heap[i] = i;
+			contained[i] = true;
+			activities[i] = 0;
+			positions[i] = i;
 		}
 
 		/* Just a way to break ties between multiple threads */
 		for (unsigned int i = 0; i < 100; ++i)
-			bump(literal(s.random() % s.nr_variables, s.random() % 2));
+			bump(s.random() % s.nr_variables);
 	}
 
 	~decide_vsids()
@@ -99,7 +101,7 @@ public:
 	{
 		debug_enter("i = $", i);
 
-		literal x = heap[i];
+		unsigned int x = heap[i];
 		unsigned int p = parent(i);
 
 		while (i > 0 && activities[x] > activities[heap[p]]) {
@@ -117,9 +119,9 @@ public:
 	{
 		debug_enter("i = $", i);
 
-		unsigned int n = heap.size();
+		unsigned int n = size;
 
-		literal x = heap[i];
+		unsigned int x = heap[i];
 
 		while (true) {
 			unsigned int l = left(i);
@@ -146,12 +148,47 @@ public:
 		positions[x] = i;
 	}
 
-	void bump(literal l)
+	void bump(unsigned int var)
 	{
-		debug_enter("literal = $", l);
+		debug_enter("variable = $", var);
 
-		++activities[l];
-		percolate_up(positions[l]);
+		if (contained[var]) {
+			++activities[var];
+			percolate_up(positions[var]);
+		} else {
+			unsigned int i = size++;
+			heap[i] = var;
+
+			contained[var] = true;
+			positions[var] = i;
+
+			percolate_up(i);
+		}
+	}
+
+	void bump(literal lit)
+	{
+		bump(lit.variable());
+	}
+
+	template<class Solver>
+	void assign(Solver &s, unsigned int variable, bool value)
+	{
+	}
+
+	template<class Solver>
+	void unassign(Solver &s, unsigned int variable)
+	{
+		if (contained[variable])
+			return;
+
+		unsigned int i = size++;
+		heap[i] = variable;
+
+		contained[variable] = true;
+		positions[variable] = i;
+
+		percolate_up(i);
 	}
 
 	template<class Solver>
@@ -172,29 +209,23 @@ public:
 	}
 
 	template<class Solver, class Propagate>
-	literal operator()(Solver &s, Propagate &p)
+	unsigned int operator()(Solver &s, Propagate &p)
 	{
 		debug_enter("");
 
-		literal l;
+		unsigned int var;
 
-		/* Since we don't actually remove elements when they get
-		 * defined, we need some kind of guarantee that we don't
-		 * just try to pick the same element all the time (if all
-		 * the elements have the same activity, for example) */
-		for (unsigned int i = 0; i < heap.size(); ++i) {
-			l = heap[i];
-			if (p.defined(l))
-				continue;
+		do {
+			assert(size > 0);
 
-			activities[l] = 0;
-			percolate_down(i);
+			var = heap[0];
+			contained[var] = false;
+			heap[0] = heap[--size];
+			positions[heap[0]] = 0;
+			percolate_down(0);
+		} while (p.defined(var));
 
-			debug("picked $", l);
-			return l;
-		}
-
-		assert(false);
+		return var;
 	}
 };
 

@@ -26,6 +26,7 @@
 #include "clause.hh"
 #include "clause_allocator.hh"
 #include "debug.hh"
+#include "decide_cached_polarity.hh"
 #include "decide_random.hh"
 #include "decide_vsids.hh"
 #include "literal.hh"
@@ -33,6 +34,7 @@
 #include "print_stdio.hh"
 #include "propagate_watchlists.hh"
 #include "receive_all.hh"
+#include "reduce_minisat.hh"
 #include "reduce_noop.hh"
 #include "reduce_size.hh"
 #include "restart_and.hh"
@@ -74,7 +76,7 @@ typedef std::vector<literal> literal_vector;
 typedef std::vector<literal_vector> literal_vector_vector;
 
 template<class Random = std::ranlux24_base,
-	class Decide = decide_vsids,
+	class Decide = decide_cached_polarity<decide_vsids>,
 	class Propagate = propagate_watchlists,
 	class Analyze = analyze_1uip,
 	class Send = send_size<4>,
@@ -176,11 +178,28 @@ public:
 		delete[] output;
 	}
 
+	void assign(unsigned int variable, bool value)
+	{
+		propagate.assign(variable, value);
+		decide.assign(*this, variable, value);
+	}
+
+	void assign(literal l, bool value)
+	{
+		assign(l.variable(), l.value() == value);
+	}
+
+	void unassign(unsigned int variable)
+	{
+		propagate.unassign(variable);
+		decide.unassign(*this, variable);
+	}
+
 	bool attach(clause c) __attribute__ ((warn_unused_result))
 	{
-		if (!propagate.attach(c))
+		if (!propagate.attach(*this, c))
 			return false;
-		if (!propagate.propagate())
+		if (!propagate.propagate(*this))
 			return false;
 
 		decide.attach(c);
@@ -255,7 +274,7 @@ public:
 
 	void decision(literal lit)
 	{
-		propagate.decision(lit);
+		propagate.decision(*this, lit);
 		print.decision(*this, lit);
 	}
 
@@ -268,7 +287,7 @@ public:
 
 	void backtrack(unsigned int decision)
 	{
-		propagate.backtrack(decision);
+		propagate.backtrack(*this, decision);
 		print.backtrack(*this, decision);
 	}
 
@@ -289,13 +308,13 @@ public:
 		 * want to and can attach clauses at other times than a
 		 * full restart. */
 		for (literal l: pending_literals) {
-			if (!propagate.implication(l, clause()))
+			if (!propagate.implication(*this, l, clause()))
 				return false;
 		}
 
 		pending_literals.clear();
 
-		if (!propagate.propagate())
+		if (!propagate.propagate(*this))
 			return false;
 
 		return true;
@@ -371,7 +390,7 @@ public:
 
 		/* Queue unit clauses */
 		for (literal l: literals) {
-			if (!propagate.implication(l, clause())) {
+			if (!propagate.implication(*this, l, clause())) {
 				unsat();
 				break;
 			}
@@ -380,7 +399,7 @@ public:
 		if (should_exit)
 			return;
 
-		if (!propagate.propagate())
+		if (!propagate.propagate(*this))
 			unsat();
 
 		printf("c Thread %u starting\n", id);
@@ -484,10 +503,10 @@ public:
 				if (conflict_clause.size() == 1) {
 					/* XXX: This can never fail, so we should not check
 					 * whether it does in the hotpath. */
-					bool ret = propagate.implication(conflict_clause[0], clause());
+					bool ret = propagate.implication(*this, conflict_clause[0], clause());
 					assert(ret);
 
-					if (!propagate.propagate()) {
+					if (!propagate.propagate(*this)) {
 						should_exit = true;
 						break;
 					}
@@ -507,7 +526,7 @@ public:
 			}
 
 			decision(decide(*this, propagate));
-			while (!propagate.propagate() && !should_exit) {
+			while (!propagate.propagate(*this) && !should_exit) {
 				if (propagate.decision_index == 0) {
 					/* A conflict at decision level 0 means the instance
 					 * is unsat. */

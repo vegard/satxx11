@@ -105,7 +105,7 @@ public:
 
 			/* XXX: This can never fail, so we should not check
 			 * whether it does in the hotpath. */
-			bool ret = p.implication(asserting_literal, clause());
+			bool ret = p.implication(s, asserting_literal, clause());
 			assert(ret);
 
 			s.share(asserting_literal);
@@ -117,7 +117,7 @@ public:
 
 			/* Automatically force the opposite polarity for the last
 			 * variable (after backtracking its consequences). */
-			bool ret = p.implication(asserting_literal, learnt_clause);
+			bool ret = p.implication(s, asserting_literal, learnt_clause);
 			assert(ret);
 
 			/* Attach the newly learnt clause. It will be satisfied by
