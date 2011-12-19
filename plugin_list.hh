@@ -22,6 +22,9 @@
 #include <tuple>
 #include <utility>
 
+#include "clause.hh"
+#include "literal.hh"
+
 /* Specify a possibly empty ordered list of generic plugins. This class just
  * forwards the calls of the solver to each element in the list. */
 template<typename... Plugins>
@@ -29,8 +32,22 @@ class plugin_list {
 public:
 	std::tuple<Plugins...> plugins;
 
-	plugin_list()
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), void>::type start(Solver &s, std::tuple<Args...> &args)
 	{
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), void>::type start(Solver &s, std::tuple<Args...> &args)
+	{
+		std::get<I>(args).start(s);
+		start<Solver, I + 1>(s, args);
+	}
+
+	template<class Solver>
+	void start(Solver &s)
+	{
+		start(s, plugins);
 	}
 
 	template<class Solver, unsigned int I = 0, typename... Args>
@@ -42,7 +59,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type assign(Solver &s, std::tuple<Args...> &args, unsigned int variable, bool value)
 	{
 		std::get<I>(args).assign(s, variable, value);
-		assign<I + 1>(s, args, variable, value);
+		assign<Solver, I + 1>(s, args, variable, value);
 	}
 
 	template<class Solver>
@@ -60,7 +77,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type unassign(Solver &s, std::tuple<Args...> &args, unsigned int variable)
 	{
 		std::get<I>(args).unassign(s, variable);
-		unassign<I + 1>(s, args, variable);
+		unassign<Solver, I + 1>(s, args, variable);
 	}
 
 	template<class Solver>
@@ -78,7 +95,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type attach(Solver &s, std::tuple<Args...> &args, literal lit)
 	{
 		std::get<I>(args).attach(s, lit);
-		attach<I + 1>(s, args, lit);
+		attach<Solver, I + 1>(s, args, lit);
 	}
 
 	template<class Solver>
@@ -96,7 +113,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type attach(Solver &s, std::tuple<Args...> &args, clause c)
 	{
 		std::get<I>(args).attach(s, c);
-		attach<I + 1>(s, args, c);
+		attach<Solver, I + 1>(s, args, c);
 	}
 
 	template<class Solver>
@@ -114,7 +131,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type detach(Solver &s, std::tuple<Args...> &args, clause c)
 	{
 		std::get<I>(args).detach(s, c);
-		detach<I + 1>(s, args, c);
+		detach<Solver, I + 1>(s, args, c);
 	}
 
 	template<class Solver>
@@ -132,7 +149,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type decision(Solver &s, std::tuple<Args...> &args, literal lit)
 	{
 		std::get<I>(args).decision(s, lit);
-		decision<I + 1>(s, args, lit);
+		decision<Solver, I + 1>(s, args, lit);
 	}
 
 	template<class Solver>
@@ -150,7 +167,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type conflict(Solver &s, std::tuple<Args...> &args)
 	{
 		std::get<I>(args).conflict(s);
-		conflict<I + 1>(s, args);
+		conflict<Solver, I + 1>(s, args);
 	}
 
 	template<class Solver>
@@ -168,7 +185,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type backtrack(Solver &s, std::tuple<Args...> &args, unsigned int decision)
 	{
 		std::get<I>(args).backtrack(s, decision);
-		backtrack<I + 1>(s, args, decision);
+		backtrack<Solver, I + 1>(s, args, decision);
 	}
 
 	template<class Solver>
@@ -186,7 +203,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type sat(Solver &s, std::tuple<Args...> &args)
 	{
 		std::get<I>(args).sat(s);
-		sat<I + 1>(s, args);
+		sat<Solver, I + 1>(s, args);
 	}
 
 	template<class Solver>
@@ -204,7 +221,7 @@ public:
 	typename std::enable_if<I < sizeof...(Args), void>::type unsat(Solver &s, std::tuple<Args...> &args)
 	{
 		std::get<I>(args).unsat(s);
-		unsat<I + 1>(s, args);
+		unsat<Solver, I + 1>(s, args);
 	}
 
 	template<class Solver>

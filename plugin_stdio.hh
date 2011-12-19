@@ -16,15 +16,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PRINT_STDIO_HH
-#define PRINT_STDIO_HH
+#ifndef PLUGIN_STDIO_HH
+#define PLUGIN_STDIO_HH
 
 #include <limits>
 
 #include "clause.hh"
 #include "literal.hh"
+#include "plugin_base.hh"
 
-class print_stdio {
+class plugin_stdio:
+	public plugin_base
+{
 public:
 	unsigned int nr_restarts;
 
@@ -57,15 +60,18 @@ public:
 		printf("c  |    |      |           |              |            |         |\n");
 	}
 
-	template<class Solver>
-	print_stdio(Solver &s):
+	plugin_stdio():
 		nr_restarts(0),
 		nr_clause_1(0),
 		nr_clause_2(0),
 		nr_clause_3(0)
 	{
 		init();
+	}
 
+	template<class Solver>
+	void start(Solver &s)
+	{
 		if (s.id == 0)
 			header();
 	}

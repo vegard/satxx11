@@ -30,9 +30,8 @@
 #include "decide_random.hh"
 #include "decide_vsids.hh"
 #include "literal.hh"
-#include "print_noop.hh"
-#include "print_stdio.hh"
 #include "plugin_list.hh"
+#include "plugin_stdio.hh"
 #include "propagate_watchlists.hh"
 #include "receive_all.hh"
 #include "reduce_minisat.hh"
@@ -86,8 +85,7 @@ template<class Random = std::ranlux24_base,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
 	class Reduce = reduce_size<2>,
 	class Simplify = simplify_list<>,
-	class Print = print_stdio,
-	class Plugin = plugin_list<>>
+	class Plugin = plugin_list<plugin_stdio>>
 class solver {
 public:
 	unsigned int nr_threads;
@@ -136,7 +134,6 @@ public:
 	Restart restart;
 	Reduce reduce;
 	Simplify simplify;
-	Print print;
 	Plugin plugin;
 
 	solver(unsigned int nr_threads,
@@ -169,11 +166,12 @@ public:
 		analyze(*this),
 		send(*this),
 		receive(*this),
-		reduce(*this),
-		print(*this)
+		reduce(*this)
 	{
 		for (unsigned int i = 0; i < nr_threads; ++i)
 			output[i] = new message();
+
+		plugin.start(*this);
 	}
 
 	~solver()
@@ -205,7 +203,6 @@ public:
 
 	void attach(literal l)
 	{
-		print.attach(*this, l);
 		plugin.attach(*this, l);
 	}
 
@@ -220,7 +217,6 @@ public:
 		send.attach(*this, c);
 		receive.attach(*this, c);
 		reduce.attach(*this, c);
-		print.attach(*this, c);
 		plugin.attach(*this, c);
 		return true;
 	}
@@ -232,7 +228,6 @@ public:
 		send.attach(*this, c);
 		receive.attach(*this, c);
 		reduce.attach(*this, c);
-		print.attach(*this, c);
 		plugin.attach(*this, c);
 	}
 
@@ -243,7 +238,6 @@ public:
 		send.detach(*this, c);
 		receive.detach(*this, c);
 		reduce.detach(*this, c);
-		print.detach(*this, c);
 		plugin.detach(*this, c);
 
 		/* After this, we are not allowed to keep any references to the
@@ -292,7 +286,6 @@ public:
 	void decision(literal lit)
 	{
 		propagate.decision(*this, lit);
-		print.decision(*this, lit);
 		plugin.decision(*this, lit);
 	}
 
@@ -312,7 +305,6 @@ public:
 	void backtrack(unsigned int decision)
 	{
 		propagate.backtrack(*this, decision);
-		print.backtrack(*this, decision);
 		plugin.backtrack(*this, decision);
 	}
 

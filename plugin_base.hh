@@ -16,16 +16,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PRINT_NOOP_HH
-#define PRINT_NOOP_HH
+#ifndef PLUGIN_BASE_HH
+#define PLUGIN_BASE_HH
 
 #include "clause.hh"
 #include "literal.hh"
 
-class print_noop {
+class plugin_base {
 public:
 	template<class Solver>
-	print_noop(Solver &s)
+	void start(Solver &s)
+	{
+	}
+
+	template<class Solver>
+	void assign(Solver &s, unsigned int variable, bool value)
+	{
+	}
+
+	template<class Solver>
+	void unassign(Solver &s, unsigned int variable)
+	{
+	}
+
+	template<class Solver>
+	void attach(Solver &s, literal lit)
 	{
 	}
 
@@ -45,7 +60,22 @@ public:
 	}
 
 	template<class Solver>
+	void conflict(Solver &s)
+	{
+	}
+
+	template<class Solver>
 	void backtrack(Solver &s, unsigned int decision)
+	{
+	}
+
+	template<class Solver>
+	void sat(Solver &s)
+	{
+	}
+
+	template<class Solver>
+	void unsat(Solver &s)
 	{
 	}
 };
