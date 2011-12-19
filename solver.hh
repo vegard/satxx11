@@ -32,6 +32,7 @@
 #include "literal.hh"
 #include "print_noop.hh"
 #include "print_stdio.hh"
+#include "plugin_list.hh"
 #include "propagate_watchlists.hh"
 #include "receive_all.hh"
 #include "reduce_minisat.hh"
@@ -85,7 +86,8 @@ template<class Random = std::ranlux24_base,
 	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
 	class Reduce = reduce_size<2>,
 	class Simplify = simplify_list<>,
-	class Print = print_stdio>
+	class Print = print_stdio,
+	class Plugin = plugin_list<>>
 class solver {
 public:
 	unsigned int nr_threads;
@@ -135,6 +137,7 @@ public:
 	Reduce reduce;
 	Simplify simplify;
 	Print print;
+	Plugin plugin;
 
 	solver(unsigned int nr_threads,
 		solver **solvers,
@@ -185,6 +188,7 @@ public:
 	{
 		propagate.assign(variable, value);
 		decide.assign(*this, variable, value);
+		plugin.assign(*this, variable, value);
 	}
 
 	void assign(literal l, bool value)
@@ -196,11 +200,13 @@ public:
 	{
 		propagate.unassign(variable);
 		decide.unassign(*this, variable);
+		plugin.unassign(*this, variable);
 	}
 
 	void attach(literal l)
 	{
 		print.attach(*this, l);
+		plugin.attach(*this, l);
 	}
 
 	bool attach(clause c) __attribute__ ((warn_unused_result))
@@ -215,6 +221,7 @@ public:
 		receive.attach(*this, c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
+		plugin.attach(*this, c);
 		return true;
 	}
 
@@ -226,6 +233,7 @@ public:
 		receive.attach(*this, c);
 		reduce.attach(*this, c);
 		print.attach(*this, c);
+		plugin.attach(*this, c);
 	}
 
 	void detach(clause c)
@@ -236,6 +244,7 @@ public:
 		receive.detach(*this, c);
 		reduce.detach(*this, c);
 		print.detach(*this, c);
+		plugin.detach(*this, c);
 
 		/* After this, we are not allowed to keep any references to the
 		 * clause. So signal to the owning thread that we no longer hold
@@ -284,6 +293,7 @@ public:
 	{
 		propagate.decision(*this, lit);
 		print.decision(*this, lit);
+		plugin.decision(*this, lit);
 	}
 
 	/* XXX: We would also like to know what we are resolving _with_... */
@@ -296,12 +306,14 @@ public:
 	void conflict()
 	{
 		decide.conflict(*this);
+		plugin.conflict(*this);
 	}
 
 	void backtrack(unsigned int decision)
 	{
 		propagate.backtrack(*this, decision);
 		print.backtrack(*this, decision);
+		plugin.backtrack(*this, decision);
 	}
 
 	/* Returns false if and only if we detected unsat. This may happen
@@ -335,8 +347,10 @@ public:
 		return true;
 	}
 
-	void verify()
+	void sat()
 	{
+		plugin.sat(*this);
+
 		/* Verify that the solution is indeed a solution */
 		for (literal_vector c: original_clauses) {
 			bool v = false;
@@ -379,6 +393,8 @@ public:
 
 	void unsat()
 	{
+		plugin.unsat(*this);
+
 		should_exit = true;
 		printf("s UNSATISFIABLE\n");
 	}
@@ -494,11 +510,11 @@ public:
 			if (propagate.trail_index == nr_variables) {
 				if (propagate.decision_index == 0 || !keep_going) {
 					should_exit = true;
-					verify();
+					sat();
 					break;
 				}
 
-				verify();
+				sat();
 
 				/* Add the negated current set of decisions
 				 * as a clause; this will prevent the solver
