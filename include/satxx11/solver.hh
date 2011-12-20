@@ -34,7 +34,6 @@
 #include <satxx11/plugin_stdio.hh>
 #include <satxx11/propagate_watchlists.hh>
 #include <satxx11/receive_all.hh>
-#include <satxx11/reduce_minisat.hh>
 #include <satxx11/reduce_noop.hh>
 #include <satxx11/reduce_size.hh>
 #include <satxx11/restart_and.hh>
