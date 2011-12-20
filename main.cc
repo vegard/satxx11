@@ -41,8 +41,8 @@ extern "C" {
 #include <satxx11/literal.hh>
 #include <satxx11/solver.hh>
 
-#include "git_diff.hh"
-#include "git_diff_cached.hh"
+#include ".git_diff.hh"
+#include ".git_diff_cached.hh"
 
 using namespace satxx11;
 
