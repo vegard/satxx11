@@ -36,13 +36,15 @@ extern "C" {
 #include <sys/time.h>
 }
 
-#include "clause.hh"
-#include "debug.hh"
-#include "literal.hh"
-#include "solver.hh"
+#include <satxx11/clause.hh>
+#include <satxx11/debug.hh>
+#include <satxx11/literal.hh>
+#include <satxx11/solver.hh>
 
 #include "git_diff.hh"
 #include "git_diff_cached.hh"
+
+using namespace satxx11;
 
 typedef unsigned int variable;
 typedef std::map<variable, variable> variable_map;
