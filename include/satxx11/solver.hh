@@ -313,7 +313,11 @@ public:
 	 * because we received some literals/clauses from other threads. */
 	bool backtrack()
 	{
-		backtrack(0);
+		propagate.backtrack(*this, 0);
+		/* XXX: For the time being, this is a small hack to prevent
+		 * the stdout plugin from seeing backtrack(0) in every restart,
+		 * and always printing 0 as the minimum backtrack level. */
+		plugin.restart(*this);
 
 		for (clause c: pending_clauses) {
 			if (!attach(c))

@@ -151,30 +151,31 @@ public:
 		static const double alpha = 0.995;
 		avg_backtrack_level = alpha * avg_backtrack_level + (1 - alpha) * decision;
 
-		/* A restart, basically. */
-		if (decision == 0) {
-			nr_restarts += 1;
+		if (decision < min_backtrack_level)
+			min_backtrack_level = decision;
+		if (decision > max_backtrack_level)
+			max_backtrack_level = decision;
+	}
 
-			if (s.id == 0 && nr_restarts % std::max<unsigned int>(1, 20 / s.nr_threads) == 0) {
-				printf("c\n");
-				header();
-			}
+	template<class Solver>
+	void restart(Solver &s)
+	{
+		nr_restarts += 1;
 
-			printf("c %2u: %3u %6u %6u/%-6u %3u/%06.2f/%-3u %2u/%06.2f/%-3u %2u/%2u/%2u\n",
-				s.id,
-				nr_restarts, nr_decisions,
-				nr_learnt_clauses_attached, nr_learnt_clauses_detached,
-				min_backtrack_level, avg_backtrack_level, max_backtrack_level,
-				min_clause_length, avg_clause_length, max_clause_length,
-				nr_clause_1, nr_clause_2, nr_clause_3);
-
-			init();
-		} else {
-			if (decision < min_backtrack_level)
-				min_backtrack_level = decision;
-			if (decision > max_backtrack_level)
-				max_backtrack_level = decision;
+		if (s.id == 0 && nr_restarts % std::max<unsigned int>(1, 20 / s.nr_threads) == 0) {
+			printf("c\n");
+			header();
 		}
+
+		printf("c %2u: %3u %6u %6u/%-6u %3u/%06.2f/%-3u %2u/%06.2f/%-3u %2u/%2u/%2u\n",
+			s.id,
+			nr_restarts, nr_decisions,
+			nr_learnt_clauses_attached, nr_learnt_clauses_detached,
+			min_backtrack_level, avg_backtrack_level, max_backtrack_level,
+			min_clause_length, avg_clause_length, max_clause_length,
+			nr_clause_1, nr_clause_2, nr_clause_3);
+
+		init();
 	}
 };
 

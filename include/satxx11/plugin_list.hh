@@ -197,6 +197,24 @@ public:
 	}
 
 	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), void>::type restart(Solver &s, std::tuple<Args...> &args)
+	{
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), void>::type restart(Solver &s, std::tuple<Args...> &args)
+	{
+		std::get<I>(args).restart(s);
+		restart<Solver, I + 1>(s, args);
+	}
+
+	template<class Solver>
+	void restart(Solver &s)
+	{
+		restart(s, plugins);
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
 	typename std::enable_if<I == sizeof...(Args), void>::type sat(Solver &s, std::tuple<Args...> &args)
 	{
 	}

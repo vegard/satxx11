@@ -72,6 +72,11 @@ public:
 	}
 
 	template<class Solver>
+	void restart(Solver &s)
+	{
+	}
+
+	template<class Solver>
 	void sat(Solver &s)
 	{
 	}
