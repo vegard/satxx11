@@ -205,6 +205,12 @@ public:
 	}
 
 	template<class Solver>
+	void resolve(Solver &s, literal l)
+	{
+		bump(l);
+	}
+
+	template<class Solver>
 	void resolve(Solver &s, clause c)
 	{
 		for (unsigned int i = 0, n = c.size(); i < n; ++i)

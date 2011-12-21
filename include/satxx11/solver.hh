@@ -290,6 +290,12 @@ public:
 		plugin.decision(*this, lit);
 	}
 
+	/* XXX: The name is a bit misleading... */
+	void resolve(literal l)
+	{
+		decide.resolve(*this, l);
+	}
+
 	/* XXX: We would also like to know what we are resolving _with_... */
 	void resolve(clause c)
 	{

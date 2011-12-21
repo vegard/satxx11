@@ -69,6 +69,7 @@ public:
 
 				if (!seen[variable]) {
 					seen[variable] = true;
+					s.resolve(lit);
 
 					unsigned int level = p.levels[variable];
 					if (level == p.decision_index) {

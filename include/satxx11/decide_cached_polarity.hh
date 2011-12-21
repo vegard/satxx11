@@ -59,6 +59,12 @@ public:
 	}
 
 	template<class Solver>
+	void resolve(Solver &s, literal l)
+	{
+		x.resolve(s, l);
+	}
+
+	template<class Solver>
 	void resolve(Solver &s, clause c)
 	{
 		x.resolve(s, c);
