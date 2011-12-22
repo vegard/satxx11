@@ -24,20 +24,13 @@ namespace satxx11 {
 template<unsigned int n>
 class restart_fixed {
 public:
-	unsigned int counter;
-
-	restart_fixed():
-		counter(0)
+	restart_fixed()
 	{
 	}
 
-	bool operator()()
+	unsigned int operator()()
 	{
-		if (++counter < n)
-			return false;
-
-		counter = 0;
-		return true;
+		return n;
 	}
 };
 

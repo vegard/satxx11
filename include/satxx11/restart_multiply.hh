@@ -16,24 +16,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SATXX11_RESTART_AND_HH
-#define SATXX11_RESTART_AND_HH
+#ifndef SATXX11_RESTART_MULTIPLY_HH
+#define SATXX11_RESTART_MULTIPLY_HH
 
 namespace satxx11 {
 
 template<class RestartA, class RestartB>
-class restart_and {
+class restart_multiply {
 public:
 	RestartA a;
 	RestartB b;
 
-	restart_and()
+	restart_multiply()
 	{
 	}
 
-	bool operator()()
+	unsigned int operator()()
 	{
-		return a() && b();
+		return a() * b();
 	}
 };
 

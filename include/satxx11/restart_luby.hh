@@ -39,24 +39,14 @@ private:
 public:
 	unsigned int counter;
 
-	unsigned int value;
-	unsigned int max;
-
 	restart_luby():
-		counter(0),
-		value(1),
-		max(luby(1))
+		counter(0)
 	{
 	}
 
-	bool operator()()
+	unsigned int operator()()
 	{
-		if (++counter < max)
-			return false;
-
-		counter = 0;
-		max = luby(++value);
-		return true;
+		return luby(++counter);
 	}
 };
 

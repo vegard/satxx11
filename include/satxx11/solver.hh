@@ -36,13 +36,10 @@
 #include <satxx11/receive_all.hh>
 #include <satxx11/reduce_noop.hh>
 #include <satxx11/reduce_size.hh>
-#include <satxx11/restart_and.hh>
 #include <satxx11/restart_fixed.hh>
 #include <satxx11/restart_geometric.hh>
 #include <satxx11/restart_luby.hh>
-#include <satxx11/restart_nested.hh>
-#include <satxx11/restart_not.hh>
-#include <satxx11/restart_or.hh>
+#include <satxx11/restart_multiply.hh>
 #include <satxx11/send_size.hh>
 #include <satxx11/simplify_list.hh>
 
@@ -83,7 +80,7 @@ template<class Random = std::ranlux24_base,
 	class Analyze = analyze_1uip,
 	class Send = send_size<4>,
 	class Receive = receive_all,
-	class Restart = restart_nested<restart_geometric<100, 10>, restart_geometric<100, 10>>,
+	class Restart = restart_multiply<restart_luby, restart_fixed<400>>,
 	class Reduce = reduce_size<2>,
 	class Simplify = simplify_list<>,
 	class Plugin = plugin_list<plugin_stdio>>
@@ -436,6 +433,9 @@ public:
 		if (!propagate.propagate(*this))
 			unsat();
 
+		unsigned int nr_conflicts = restart();
+		assert(nr_conflicts > 0);
+
 		while (!should_exit) {
 			/* This orders the writes to our outgoing messages with the atomic
 			 * compare and exchange below. This barrier is paired with the
@@ -571,7 +571,11 @@ public:
 					break;
 				}
 
-				if (restart()) {
+				if (--nr_conflicts == 0) {
+					/* Restart */
+					nr_conflicts = restart();
+					assert(nr_conflicts > 0);
+
 					if (!backtrack()) {
 						unsat();
 						break;
