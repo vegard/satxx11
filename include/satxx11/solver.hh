@@ -171,8 +171,6 @@ public:
 	{
 		for (unsigned int i = 0; i < nr_threads; ++i)
 			output[i] = new message();
-
-		plugin.start(*this);
 	}
 
 	~solver()
@@ -406,6 +404,8 @@ public:
 	{
 		debug_thread_id = id;
 
+		plugin.start(*this);
+
 		/* XXX: We currently attach clauses before propagating unit
 		 * literals because we might otherwise try to attach a clause
 		 * that would immediately propagate a value (and we don't
@@ -435,8 +435,6 @@ public:
 
 		if (!propagate.propagate(*this))
 			unsat();
-
-		printf("c Thread %u starting\n", id);
 
 		while (!should_exit) {
 			/* This orders the writes to our outgoing messages with the atomic

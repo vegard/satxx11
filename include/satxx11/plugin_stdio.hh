@@ -32,10 +32,11 @@ class plugin_stdio:
 {
 public:
 	unsigned int nr_restarts;
+	unsigned int nr_conflicts;
+	unsigned int nr_decisions;
 
 	unsigned int nr_learnt_clauses_attached;
 	unsigned int nr_learnt_clauses_detached;
-	unsigned int nr_decisions;
 
 	double avg_backtrack_level;
 	unsigned int min_backtrack_level;
@@ -52,14 +53,15 @@ public:
 	void header()
 	{
 		/* XXX: Dynamically adjust column widths. */
-		printf("c  Thread number\n");
-		printf("c  |    Number of restarts\n");
-		printf("c  |    |   Number of decisions\n");
-		printf("c  |    |      |           Number of learnt clauses (attached/detached)\n");
-		printf("c  |    |      |           |              Backtrack level (min/avg/max)\n");
-		printf("c  |    |      |           |              |            Clause length (min/avg/max)\n");
-		printf("c  |    |      |           |              |            |         Number of learnt clauses (size 1/2/3)\n");
-		printf("c  |    |      |           |              |            |         |\n");
+		printf("c  Thread\n");
+		printf("c  |    Restarts (total)\n");
+		printf("c  |    |      Conflicts\n");
+		printf("c  |    |      |      Decisions\n");
+		printf("c  |    |      |      |        Backtrack level (min/avg/max)\n");
+		printf("c  |    |      |      |        |             Learnt clauses (attached/detached)\n");
+		printf("c  |    |      |      |        |             |             Clause length (min/avg/max)\n");
+		printf("c  |    |      |      |        |             |             |           Learnt clauses (size 1/2/3)\n");
+		printf("c  |    |      |      |        |             |             |           |\n");
 	}
 
 	plugin_stdio():
@@ -71,18 +73,13 @@ public:
 		init();
 	}
 
-	template<class Solver>
-	void start(Solver &s)
-	{
-		if (s.id == 0)
-			header();
-	}
-
 	void init()
 	{
+		nr_conflicts = 0;
+		nr_decisions = 0;
+
 		nr_learnt_clauses_attached = 0;
 		nr_learnt_clauses_detached = 0;
-		nr_decisions = 0,
 
 		avg_backtrack_level = 0;
 		min_backtrack_level = std::numeric_limits<unsigned int>::max();
@@ -91,6 +88,15 @@ public:
 		avg_clause_length = 0;
 		min_clause_length = std::numeric_limits<unsigned int>::max();
 		max_clause_length = std::numeric_limits<unsigned int>::min();
+	}
+
+	template<class Solver>
+	void start(Solver &s)
+	{
+		printf("c Thread %u starting\n", s.id);
+
+		if (s.id == 0)
+			header();
 	}
 
 	void attach(unsigned int n)
@@ -142,7 +148,13 @@ public:
 	template<class Solver>
 	void decision(Solver &s, literal lit)
 	{
-		nr_decisions += 1;
+		++nr_decisions;
+	}
+
+	template<class Solver>
+	void conflict(Solver &s)
+	{
+		++nr_conflicts;
 	}
 
 	template<class Solver>
@@ -160,18 +172,19 @@ public:
 	template<class Solver>
 	void restart(Solver &s)
 	{
-		nr_restarts += 1;
+		++nr_restarts;
 
+		/* Try to print the header approximately every 20 lines */
 		if (s.id == 0 && nr_restarts % std::max<unsigned int>(1, 20 / s.nr_threads) == 0) {
 			printf("c\n");
 			header();
 		}
 
-		printf("c %2u: %3u %6u %6u/%-6u %3u/%06.2f/%-3u %2u/%06.2f/%-3u %2u/%2u/%2u\n",
+		printf("c %2u: %3u %6u %6u %3u/%06.2f/%-3u %6u/%-6u %2u/%06.2f/%-3u %2u/%2u/%2u\n",
 			s.id,
-			nr_restarts, nr_decisions,
-			nr_learnt_clauses_attached, nr_learnt_clauses_detached,
+			nr_restarts, nr_conflicts, nr_decisions,
 			min_backtrack_level, avg_backtrack_level, max_backtrack_level,
+			nr_learnt_clauses_attached, nr_learnt_clauses_detached,
 			min_clause_length, avg_clause_length, max_clause_length,
 			nr_clause_1, nr_clause_2, nr_clause_3);
 
