@@ -219,8 +219,6 @@ public:
 
 	void attach(clause c)
 	{
-		for (unsigned int i = 0, n = c.size(); i < n; ++i)
-			bump(c[i]);
 	}
 
 	void detach(clause c)
