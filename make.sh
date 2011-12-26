@@ -22,4 +22,4 @@ git_revision="`git rev-parse --verify HEAD`"
 
 defines="-DCONFIG_ASSERT_HOTPATH=${config_assert_hotpath} -DCONFIG_DEBUG=${config_debug} -DGIT_REVISION=\"${git_revision}\""
 
-g++ -std=gnu++0x -O3 -Wall -g -Iinclude ${defines} -o solver main.cc -lboost_program_options -lpthread
+g++ -std=gnu++0x -O3 -Wall -Wno-uninitialized -g -Iinclude ${defines} -o solver main.cc -lboost_program_options -lpthread
