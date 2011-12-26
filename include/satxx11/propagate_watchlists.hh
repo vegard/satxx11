@@ -316,7 +316,7 @@ public:
 
 	/* Return false if and only if there was a conflict. */
 	template<class Solver>
-	bool find_new_watch(Solver &s, clause c, unsigned int watch, bool &replace)
+	bool find_new_watch(Solver &s, clause c, const watch_indices &wi, unsigned int watch, bool &replace)
 	{
 		debug_enter("clause = $", c);
 
@@ -324,8 +324,6 @@ public:
 		 * entirely in sync with the current assignments, because
 		 * variables are assigned before the propagations are
 		 * actually carried out (and watchlists updated). */
-
-		watch_indices wi = watches[c.thread()][c.index()];
 
 		/* Find a new watch */
 		unsigned int n = c.size();
@@ -380,6 +378,9 @@ public:
 		unsigned int n = w.size();
 		debug("watchlist size = $", n);
 
+		if (2 < n)
+			__builtin_prefetch(w[2].data, 0);
+
 		for (unsigned int i = 0; i < n;) {
 			/* XXX: Make the prefetch distance configurable. */
 			/* We tested baseline (138s), +4 (121s), +5 (110s),
@@ -404,7 +405,7 @@ public:
 			assert_hotpath((c[wi[0]] == ~lit) ^ (c[wi[1]] == ~lit));
 
 			bool replace = false;
-			if (!find_new_watch(s, c, c[wi[1]] == ~lit, replace))
+			if (!find_new_watch(s, c, wi, c[wi[1]] == ~lit, replace))
 				return debug_return(false, "$");
 
 			if (replace) {
