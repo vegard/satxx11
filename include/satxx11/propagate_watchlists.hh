@@ -34,8 +34,22 @@
 
 namespace satxx11 {
 
+template<unsigned int propagate_prefetch_first_clause = 2,
+	/* We tested baseline (162s), +1 (148s), +2 (138s),
+	 * +3 (136s), +4 (136s), +5 (140s). Supplying an
+	 * argument of 1 for the rw parameter made it worse
+	 * by 2-10s. */
+	unsigned int propagate_prefetch_watchlist = 3,
+	/* We tested baseline (138s), +4 (121s), +5 (110s),
+	 * and +6 (112s). */
+	unsigned int propagate_prefetch_clause = 5>
 class propagate_watchlists {
 public:
+	static_assert(propagate_prefetch_first_clause < propagate_prefetch_watchlist,
+		"propagate_prefetch_first_clause < propagate_prefetch_watchlist");
+	static_assert(propagate_prefetch_watchlist < propagate_prefetch_clause,
+		"propagate_prefetch_watchlist < propagate_prefetch_clause");
+
 	unsigned int nr_variables;
 
 	/* XXX: Maybe put this in its own class using uint8 or something. */
@@ -378,24 +392,19 @@ public:
 		unsigned int n = w.size();
 		debug("watchlist size = $", n);
 
-		if (2 < n)
-			__builtin_prefetch(w[2].data, 0);
+		if (propagate_prefetch_first_clause < n)
+			__builtin_prefetch(w[propagate_prefetch_first_clause].data, 0);
 
 		for (unsigned int i = 0; i < n;) {
-			/* XXX: Make the prefetch distance configurable. */
-			/* We tested baseline (138s), +4 (121s), +5 (110s),
-			 * and +6 (112s). */
-			if (i + 5 < n)
-				__builtin_prefetch(w[i + 5].data, 0);
+			if (i + propagate_prefetch_clause < n)
+				__builtin_prefetch(w[i + propagate_prefetch_clause].data, 0);
 
-			/* XXX: Make the prefetch distance configurable. */
-			/* We tested baseline (162s), +1 (148s), +2 (138s),
-			 * +3 (136s), +4 (136s), +5 (140s). Supplying an
-			 * argument of 1 for the rw parameter made it worse
-			 * by 2-10s. */
-			if (i + 3 < n)
-				__builtin_prefetch(&watches[w[i + 3].thread()][w[i + 3].index()], 0);
+			if (i + propagate_prefetch_watchlist < n)
+				__builtin_prefetch(&watches[w[i + propagate_prefetch_watchlist].thread()][w[i + propagate_prefetch_watchlist].index()], 0);
 
+			/* Don't use "n" here... That's the whole point; we want to
+			 * make sure that n correctly reflects the true size of the
+			 * watchlist. */
 			assert_hotpath(i < w.size());
 
 			clause c = w[i];

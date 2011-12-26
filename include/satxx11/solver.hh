@@ -76,7 +76,7 @@ typedef std::vector<literal_vector> literal_vector_vector;
 
 template<class Random = std::ranlux24_base,
 	class Decide = decide_cached_polarity<decide_vsids<95>>,
-	class Propagate = propagate_watchlists,
+	class Propagate = propagate_watchlists<>,
 	class Analyze = analyze_1uip,
 	class Send = send_size<4>,
 	class Receive = receive_all,
