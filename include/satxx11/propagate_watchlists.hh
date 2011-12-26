@@ -22,7 +22,6 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
-#include <queue>
 #include <vector>
 
 #include <satxx11/assert_hotpath.hh>
@@ -62,13 +61,11 @@ public:
 	/* XXX: Use uint32_t for variables */
 	unsigned int *trail;
 	unsigned int trail_index;
+	unsigned int trail_size;
 
 	/* XXX: Use uint32_t for variables */
 	unsigned int *decisions;
 	unsigned int decision_index;
-
-	/* XXX: Use trail for this */
-	std::queue<literal> queue;
 
 	/* Indexed by variable. Gives the reason why a variable was set
 	 * if the variable was implied. */
@@ -88,6 +85,7 @@ public:
 		watches(new std::vector<watch_indices>[nr_threads]),
 		trail(new unsigned int[nr_variables]),
 		trail_index(0),
+		trail_size(0),
 		decisions(new unsigned int[nr_variables]),
 		decision_index(0),
 		reasons(new clause[nr_variables]),
@@ -285,16 +283,16 @@ public:
 		debug_enter("literal = $", lit);
 
 		assert_hotpath(!defined(lit));
+		assert_hotpath(trail_index == trail_size);
 
 		unsigned int variable = lit.variable();
 		s.assign(lit, true);
-		trail[trail_index] = variable;
-		decisions[decision_index] = trail_index;
-		++trail_index;
+		trail[trail_size] = variable;
+		decisions[decision_index] = trail_size;
+		++trail_size;
 		reasons[variable] = clause();
 		++decision_index;
 		levels[variable] = decision_index;
-		queue.push(lit);
 	}
 
 	/* Called whenever a variable is forced to a particular value. The
@@ -320,11 +318,10 @@ public:
 
 		unsigned int variable = lit.variable();
 		s.assign(lit, true);
-		trail[trail_index] = variable;
-		++trail_index;
+		trail[trail_size] = variable;
+		++trail_size;
 		reasons[variable] = reason;
 		levels[variable] = decision_index;
-		queue.push(lit);
 		return debug_return(true, "$ /* no conflict */");
 	}
 
@@ -434,13 +431,15 @@ public:
 	{
 		debug_enter("");
 
-		while (!queue.empty()) {
-			literal lit = queue.front();
-			queue.pop();
+		while (trail_index < trail_size) {
+			debug("trail_index = $, trail_size = $", trail_index, trail_size);
+			unsigned int var = trail[trail_index++];
 
 			/* If propagation caused a conflict, abort the rest
 			 * of the conflicts as well. */
-			if (!propagate(s, lit))
+			/* XXX: Make a version of propagate() that takes the
+			 * variable and the value as separate arguments. */
+			if (!propagate(s, literal(var, value(var))))
 				return debug_return(false, "$");
 		}
 
@@ -456,17 +455,16 @@ public:
 
 		/* Unassign the variables that we've assigned since the
 		 * given index. */
-		unsigned new_trail_index = decisions[decision];
-		debug("new trail index = $", new_trail_index);
+		unsigned new_trail_size = decisions[decision];
+		debug("new trail size = $", new_trail_size);
 
-		for (unsigned int i = trail_index; i-- > new_trail_index; )
+		/* XXX: It doesn't REALLY matter what order we do this in. */
+		for (unsigned int i = trail_size; i-- > new_trail_size; )
 			s.unassign(trail[i]);
 
-		trail_index = new_trail_index;
+		trail_index = new_trail_size;
+		trail_size = new_trail_size;
 		decision_index = decision;
-
-		/* Clear queue (XXX: Use trail for this) */
-		queue = std::queue<literal>();
 	}
 };
 
