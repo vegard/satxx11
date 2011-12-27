@@ -58,12 +58,10 @@ public:
 	/* Use as follows: watches[thread_id][clause_id] */
 	std::vector<watch_indices> *watches;
 
-	/* XXX: Use uint32_t for variables */
 	unsigned int *trail;
 	unsigned int trail_index;
 	unsigned int trail_size;
 
-	/* XXX: Use uint32_t for variables */
 	unsigned int *decisions;
 	unsigned int decision_index;
 
@@ -72,7 +70,6 @@ public:
 	clause *reasons;
 
 	/* Decision level at which the variable was set. */
-	/* XXX: Use uint32_t? */
 	unsigned int *levels;
 
 	literal conflict_literal;
