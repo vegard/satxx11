@@ -310,6 +310,46 @@ public:
 		plugin.backtrack(*this, decision);
 	}
 
+	bool is_redundant(clause c)
+	{
+		/* XXX: Implement a mechanism for signalling the other
+		 * threads that the clause is redundant (and if so, why),
+		 * so that the original thread can benefit from our
+		 * discovery. */
+
+		for (unsigned int i = 1, n = c.size(); i < n; ++i) {
+			propagate.decision(*this, ~c[i]);
+			if (!propagate.propagate(*this)) {
+				/* The clause is subsumed by knowledge that
+				 * we already have (i.e. it is implied by the
+				 * clause database); don't attach it. */
+				propagate.backtrack(*this, 0);
+				return true;
+			}
+		}
+
+		literal lit = c[0];
+
+		if (propagate.defined(lit)) {
+			if (propagate.value(lit) == true) {
+				/* The last literal is implied by the clause
+				 * database; don't attach it. */
+				propagate.backtrack(*this, 0);
+				return true;
+			} else {
+				/* The negated literal was implied. This
+				 * means that we can shorten the clause. */
+				/* XXX: Actually shorten it. */
+				propagate.backtrack(*this, 0);
+				return false;
+			}
+		}
+
+		/* As far as we could tell, the clause is not redundant. */
+		propagate.backtrack(*this, 0);
+		return false;
+	}
+
 	/* Returns false if and only if we detected unsat. This may happen
 	 * because we received some literals/clauses from other threads. */
 	bool backtrack()
@@ -319,13 +359,6 @@ public:
 		 * the stdout plugin from seeing backtrack(0) in every restart,
 		 * and always printing 0 as the minimum backtrack level. */
 		plugin.restart(*this);
-
-		for (clause c: pending_clauses) {
-			if (!attach(c))
-				return false;
-		}
-
-		pending_clauses.clear();
 
 		/* XXX: This might change if/when we figure out that we
 		 * want to and can attach clauses at other times than a
@@ -338,6 +371,20 @@ public:
 		}
 
 		pending_literals.clear();
+
+		for (clause c: pending_clauses) {
+			if (is_redundant(c)) {
+				unsigned int thread = c.thread();
+				output[thread]->detached_clauses.push_back(c.index());
+				output[thread]->empty = false;
+				continue;
+		}
+
+			if (!attach(c))
+				return false;
+		}
+
+		pending_clauses.clear();
 
 		if (!propagate.propagate(*this))
 			return false;
