@@ -372,6 +372,9 @@ public:
 
 		pending_literals.clear();
 
+		if (!propagate.propagate(*this))
+			return false;
+
 		for (clause c: pending_clauses) {
 			if (is_redundant(c)) {
 				unsigned int thread = c.thread();
