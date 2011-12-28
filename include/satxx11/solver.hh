@@ -317,6 +317,8 @@ public:
 		 * so that the original thread can benefit from our
 		 * discovery. */
 
+		unsigned int nr_decisions = 0;
+
 		for (unsigned int i = 1, n = c.size(); i < n; ++i) {
 			unsigned int var = c[i].variable();
 
@@ -330,6 +332,7 @@ public:
 				continue;
 			}
 
+			++nr_decisions;
 			propagate.decision(*this, ~c[i]);
 			if (!propagate.propagate(*this)) {
 				/* The clause is subsumed by knowledge that
@@ -346,19 +349,22 @@ public:
 			if (propagate.value(lit) == true) {
 				/* The last literal is implied by the clause
 				 * database; don't attach it. */
-				propagate.backtrack(*this, 0);
+				if (nr_decisions)
+					propagate.backtrack(*this, 0);
 				return true;
 			} else {
 				/* The negated literal was implied. This
 				 * means that we can shorten the clause. */
 				/* XXX: Actually shorten it. */
-				propagate.backtrack(*this, 0);
+				if (nr_decisions)
+					propagate.backtrack(*this, 0);
 				return false;
 			}
 		}
 
 		/* As far as we could tell, the clause is not redundant. */
-		propagate.backtrack(*this, 0);
+		if (nr_decisions)
+			propagate.backtrack(*this, 0);
 		return false;
 	}
 
