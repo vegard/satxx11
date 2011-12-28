@@ -318,6 +318,18 @@ public:
 		 * discovery. */
 
 		for (unsigned int i = 1, n = c.size(); i < n; ++i) {
+			unsigned int var = c[i].variable();
+
+			if (propagate.defined(var)) {
+				/* The clause is already satisfied! */
+				if (propagate.value(var) == c[i].value())
+					return true;
+
+				/* The literal is already falsified. This means
+				 * we could simplify the clause, though. */
+				continue;
+			}
+
 			propagate.decision(*this, ~c[i]);
 			if (!propagate.propagate(*this)) {
 				/* The clause is subsumed by knowledge that
