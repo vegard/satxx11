@@ -82,7 +82,7 @@ template<class Random = std::ranlux24_base,
 	class Analyze = analyze_1uip<minimise_minisat>,
 	class Send = send_size<4>,
 	class Receive = receive_all,
-	class Restart = restart_multiply<restart_luby, restart_fixed<400>>,
+	class NextRestart = restart_multiply<restart_luby, restart_fixed<400>>,
 	class Reduce = reduce_size<2>,
 	class Simplify = simplify_list<>,
 	class Plugin = plugin_list<plugin_stdio>>
@@ -131,7 +131,7 @@ public:
 	Analyze analyze;
 	Send send;
 	Receive receive;
-	Restart restart;
+	NextRestart next_restart;
 	Reduce reduce;
 	Simplify simplify;
 	Plugin plugin;
@@ -375,7 +375,7 @@ public:
 
 	/* Returns false if and only if we detected unsat. This may happen
 	 * because we received some literals/clauses from other threads. */
-	bool backtrack()
+	bool restart()
 	{
 		propagate.backtrack(*this, 0);
 		/* XXX: For the time being, this is a small hack to prevent
@@ -506,7 +506,7 @@ public:
 		if (!propagate.propagate(*this))
 			unsat();
 
-		unsigned int nr_conflicts = restart();
+		unsigned int nr_conflicts = next_restart();
 		assert(nr_conflicts > 0);
 
 		while (!should_exit) {
@@ -646,10 +646,10 @@ public:
 
 				if (--nr_conflicts == 0) {
 					/* Restart */
-					nr_conflicts = restart();
+					nr_conflicts = next_restart();
 					assert(nr_conflicts > 0);
 
-					if (!backtrack()) {
+					if (!restart()) {
 						unsat();
 						break;
 					}
