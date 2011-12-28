@@ -86,10 +86,10 @@ public:
 		x.conflict(s);
 	}
 
-	template<class Solver, class Propagate>
-	literal operator()(Solver &s, Propagate &p)
+	template<class Solver>
+	literal operator()(Solver &s)
 	{
-		unsigned int var = x(s, p);
+		unsigned int var = x(s);
 		literal lit(var, polarities[var]);
 		polarities[var] = !polarities[var];
 		return lit;

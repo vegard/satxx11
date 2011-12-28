@@ -39,10 +39,10 @@ public:
 	{
 	}
 
-	template<class Solver, class Propagate>
-	literal operator()(Solver &s, Propagate &p)
+	template<class Solver>
+	literal operator()(Solver &s)
 	{
-		assert(p.trail_index < s.nr_variables);
+		assert(s.propagate.trail_index < s.nr_variables);
 
 		/* Find unassigned literal */
 		unsigned int variable;
@@ -50,7 +50,7 @@ public:
 		/* Pick a variable at random */
 		do {
 			variable = s.random() % s.nr_variables;
-		} while (p.defined(variable));
+		} while (s.defined(variable));
 
 		return literal(variable, s.random() % 2);
 	}

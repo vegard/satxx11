@@ -231,8 +231,8 @@ public:
 		var_inc *= 1 / (var_decay / 100.);
 	}
 
-	template<class Solver, class Propagate>
-	unsigned int operator()(Solver &s, Propagate &p)
+	template<class Solver>
+	unsigned int operator()(Solver &s)
 	{
 		debug_enter("");
 
@@ -246,7 +246,7 @@ public:
 			heap[0] = heap[--size];
 			positions[heap[0]] = 0;
 			percolate_down(0);
-		} while (p.defined(var));
+		} while (s.defined(var));
 
 		return var;
 	}

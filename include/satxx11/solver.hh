@@ -98,6 +98,8 @@ public:
 	const variable_map &reverse_variables;
 	const literal_vector_vector &original_clauses;
 
+	std::vector<bool> valuation;
+
 	clause_allocator allocate;
 
 	/* A message to/from other threads */
@@ -156,6 +158,8 @@ public:
 		reverse_variables(reverse_variables),
 		original_clauses(original_clauses),
 
+		valuation(2 * nr_variables),
+
 		/* XXX: Not RAII. */
 		output(new message *[nr_threads]),
 		channel(0),
@@ -181,9 +185,39 @@ public:
 		delete[] output;
 	}
 
+	bool defined(unsigned int variable) const
+	{
+		assert_hotpath(variable < nr_variables);
+		return valuation[2 * variable + 0];
+	}
+
+	bool defined(literal l) const
+	{
+		return defined(l.variable());
+	}
+
+	bool value(unsigned int variable) const
+	{
+		assert_hotpath(variable < nr_variables);
+		assert_hotpath(defined(variable));
+		return valuation[2 * variable + 1];
+	}
+
+	bool value(literal l) const
+	{
+		return value(l.variable()) == l.value();
+	}
+
 	void assign(unsigned int variable, bool value)
 	{
-		propagate.assign(variable, value);
+		debug_enter("variable = $, value = $", variable, value);
+
+		assert_hotpath(variable < nr_variables);
+		assert_hotpath(!defined(variable));
+		valuation[2 * variable + 0] = true;
+		valuation[2 * variable + 1] = value;
+
+		//propagate.assign(variable, value);
 		decide.assign(*this, variable, value);
 		plugin.assign(*this, variable, value);
 	}
@@ -195,7 +229,12 @@ public:
 
 	void unassign(unsigned int variable)
 	{
-		propagate.unassign(variable);
+		debug_enter("variable = $", variable);
+
+		assert_hotpath(variable < nr_variables);
+		assert_hotpath(defined(variable));
+		valuation[2 * variable + 0] = false;
+
 		decide.unassign(*this, variable);
 		plugin.unassign(*this, variable);
 	}
@@ -328,9 +367,9 @@ public:
 		for (unsigned int i = 1, n = c.size(); i < n; ++i) {
 			unsigned int var = c[i].variable();
 
-			if (propagate.defined(var)) {
+			if (defined(var)) {
 				/* The clause is already satisfied! */
-				if (propagate.value(var) == c[i].value())
+				if (value(var) == c[i].value())
 					return true;
 
 				/* The literal is already falsified. This means
@@ -351,8 +390,8 @@ public:
 
 		literal lit = c[0];
 
-		if (propagate.defined(lit)) {
-			if (propagate.value(lit) == true) {
+		if (defined(lit)) {
+			if (value(lit) == true) {
 				/* The last literal is implied by the clause
 				 * database; don't attach it. */
 				if (nr_decisions)
@@ -427,8 +466,8 @@ public:
 		for (literal_vector c: original_clauses) {
 			bool v = false;
 			for (literal lit: c) {
-				assert(propagate.defined(lit));
-				v = v || propagate.value(lit);
+				assert(defined(lit));
+				v = v || value(lit);
 			}
 
 			assert(v);
@@ -440,20 +479,20 @@ public:
 		variable_map::const_iterator end = variables.end();
 
 		if (it != end) {
-			assert(propagate.defined(it->second));
+			assert(defined(it->second));
 
-			if (!propagate.value(it->second))
+			if (!value(it->second))
 				ss << "-";
 
 			ss << it->first;
 		}
 
 		while (++it != end) {
-			assert(propagate.defined(it->second));
+			assert(defined(it->second));
 
 			ss << " ";
 
-			if (!propagate.value(it->second))
+			if (!value(it->second))
 				ss << "-";
 
 			ss << it->first;
@@ -599,8 +638,7 @@ public:
 				for (unsigned int i = 0; i < propagate.decision_index; ++i) {
 					unsigned int variable = propagate.trail[propagate.decisions[i]];
 
-					conflict_clause.push_back(literal(variable,
-						!propagate.value(variable)));
+					conflict_clause.push_back(literal(variable, !value(variable)));
 				}
 
 				backtrack(0);
@@ -631,7 +669,7 @@ public:
 				continue;
 			}
 
-			decision(decide(*this, propagate));
+			decision(decide(*this));
 			while (!propagate.propagate(*this) && !should_exit) {
 				conflict();
 

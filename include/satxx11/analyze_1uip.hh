@@ -94,7 +94,7 @@ public:
 			--counter;
 		} while (counter > 0);
 
-		literal asserting_literal = ~literal(variable, p.value(variable));
+		literal asserting_literal = ~literal(variable, s.value(variable));
 
 		if (conflict_clause.size() > 0)
 			minimise(s, seen, conflict_clause);

@@ -52,7 +52,6 @@ public:
 	unsigned int nr_variables;
 
 	/* XXX: Maybe put this in its own class using uint8 or something. */
-	std::vector<bool> valuation;
 	watchlist *watchlists;
 
 	/* Use as follows: watches[thread_id][clause_id] */
@@ -77,7 +76,6 @@ public:
 
 	propagate_watchlists(unsigned int nr_threads, unsigned int nr_variables):
 		nr_variables(nr_variables),
-		valuation(2 * nr_variables),
 		watchlists(new watchlist[2 * nr_variables]),
 		watches(new std::vector<watch_indices>[nr_threads]),
 		trail(new unsigned int[nr_variables]),
@@ -98,48 +96,6 @@ public:
 		delete[] decisions;
 	}
 
-	bool defined(unsigned int variable) const
-	{
-		assert_hotpath(variable < nr_variables);
-		return valuation[2 * variable + 0];
-	}
-
-	bool defined(literal l) const
-	{
-		return defined(l.variable());
-	}
-
-	bool value(unsigned int variable) const
-	{
-		assert_hotpath(variable < nr_variables);
-		assert_hotpath(defined(variable));
-		return valuation[2 * variable + 1];
-	}
-
-	bool value(literal l) const
-	{
-		return value(l.variable()) == l.value();
-	}
-
-	void assign(unsigned int variable, bool value)
-	{
-		debug_enter("variable = $, value = $", variable, value);
-
-		assert_hotpath(variable < nr_variables);
-		assert_hotpath(!defined(variable));
-		valuation[2 * variable + 0] = true;
-		valuation[2 * variable + 1] = value;
-	}
-
-	void unassign(unsigned int variable)
-	{
-		debug_enter("variable = $", variable);
-
-		assert_hotpath(variable < nr_variables);
-		assert_hotpath(defined(variable));
-		valuation[2 * variable + 0] = false;
-	}
-
 	void attach_with_watches(clause c, unsigned int i, unsigned int j)
 	{
 		debug_enter("clause = $, i = $, j = $", c, i, j);
@@ -157,7 +113,8 @@ public:
 		watches[c.thread()][c.index()] = w;
 	}
 
-	void attach_true_and_undefined(clause c)
+	template<class Solver>
+	void attach_true_and_undefined(Solver &s, clause c)
 	{
 		/* We can select undefined and true literals (if we select an
 		 * undefined one, we may visit it during propagation when it
@@ -170,11 +127,11 @@ public:
 
 		unsigned int size = c.size();
 		for (unsigned int i = 0; i < size; ++i) {
-			if (defined(c[i]) && !value(c[i]))
+			if (s.defined(c[i]) && !s.value(c[i]))
 				continue;
 
 			for (unsigned int j = i + 1; j < size; ++j) {
-				if (defined(c[j]) && !value(c[j]))
+				if (s.defined(c[j]) && !s.value(c[j]))
 					continue;
 
 				attach_with_watches(c, i, j);
@@ -213,8 +170,8 @@ public:
 
 		unsigned int size = c.size();
 		for (unsigned int i = 0; i < size; ++i) {
-			if (defined(c[i])) {
-				if (value(c[i])) {
+			if (s.defined(c[i])) {
+				if (s.value(c[i])) {
 					if (!(found & 1)) {
 						found |= 1;
 						found_true = i;
@@ -281,7 +238,7 @@ public:
 	{
 		debug_enter("literal = $", lit);
 
-		assert_hotpath(!defined(lit));
+		assert_hotpath(!s.defined(lit));
 		assert_hotpath(trail_index == trail_size);
 
 		unsigned int variable = lit.variable();
@@ -302,12 +259,12 @@ public:
 	{
 		debug_enter("literal = $", lit);
 
-		if (defined(lit)) {
+		if (s.defined(lit)) {
 			/* If it's already defined to have the right value,
 			 * we don't have a conflict. */
 			/* XXX: In this case, Minisat changes reasons[variable]
 			 * if the new reason is a smaller clause. */
-			if (value(lit))
+			if (s.value(lit))
 				return debug_return(true, "$ /* no conflict; already defined */");
 
 			conflict_literal = lit;
@@ -340,8 +297,8 @@ public:
 		for (unsigned int i = 0; i < n; ++i) {
 			literal l = c[i];
 
-			if (defined(l)) {
-				if (value(l)) {
+			if (s.defined(l)) {
+				if (s.value(l)) {
 					/* Literal was already satisfied;
 					 * clause is satisfied; we don't
 					 * need to do _anything_ else here */
@@ -378,8 +335,8 @@ public:
 
 		/* Every variable that we are propagating should
 		 * already be defined with the correct polarity. */
-		assert_hotpath(defined(lit));
-		assert_hotpath(value(lit));
+		assert_hotpath(s.defined(lit));
+		assert_hotpath(s.value(lit));
 
 		/* Go through the watchlist; for each clause in
 		 * the watchlist, we need to look for a new watch. */
@@ -438,7 +395,7 @@ public:
 			 * of the conflicts as well. */
 			/* XXX: Make a version of propagate() that takes the
 			 * variable and the value as separate arguments. */
-			if (!propagate(s, literal(var, value(var))))
+			if (!propagate(s, literal(var, s.value(var))))
 				return debug_return(false, "$");
 		}
 
