@@ -402,7 +402,7 @@ public:
 				output[thread]->detached_clauses.push_back(c.index());
 				output[thread]->empty = false;
 				continue;
-		}
+			}
 
 			if (!attach(c))
 				return false;
