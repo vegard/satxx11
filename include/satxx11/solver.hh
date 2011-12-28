@@ -267,8 +267,11 @@ public:
 
 	void share(clause c)
 	{
-		if (!send(*this, c))
-			return;
+		/* Always share non-learnt (i.e. non-removable) clauses. */
+		if (c.is_learnt()) {
+			if (!send(*this, c))
+				return;
+		}
 
 		for (unsigned int i = 0; i < nr_threads; ++i) {
 			if (i == id)
