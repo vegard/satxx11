@@ -19,7 +19,7 @@
 #ifndef SATXX11_ASSERT_HOTPATH_HH
 #define SATXX11_ASSERT_HOTPATH_HH
 
-#include <cassert>
+#include <satxx11/assert.hh>
 
 #if CONFIG_ASSERT_HOTPATH == 1
 #define assert_hotpath(condition) assert(condition)

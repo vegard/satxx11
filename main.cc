@@ -17,7 +17,6 @@
  */
 
 #include <atomic>
-#include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
@@ -36,6 +35,7 @@ extern "C" {
 #include <sys/time.h>
 }
 
+#include <satxx11/assert.hh>
 #include <satxx11/clause.hh>
 #include <satxx11/debug.hh>
 #include <satxx11/literal.hh>

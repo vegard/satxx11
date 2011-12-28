@@ -19,11 +19,11 @@
 #ifndef SATXX11_PROPAGATE_WATCHLISTS_HH
 #define SATXX11_PROPAGATE_WATCHLISTS_HH
 
-#include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <vector>
 
+#include <satxx11/assert.hh>
 #include <satxx11/assert_hotpath.hh>
 #include <satxx11/clause.hh>
 #include <satxx11/debug.hh>
