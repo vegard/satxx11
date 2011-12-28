@@ -254,15 +254,17 @@ public:
 				attach_with_watches(c, found_true, found_false);
 				return true;
 			}
-		} else {
-			assert(found & 4);
-			/* No true literal! This means one of the undefined ones must be implied. */
+		} else if (found & 4) {
+			/* No true literal, but we did find an undefined one, so the undefined one
+			 * must be implied. */
 			/* XXX: implication() assumes the literal may be defined or undefined. From
 			 * this particular callsite it is always undefined, so we could optimize it. */
 			return implication(s, c[found_undefined], c);
 		}
 
-		assert(false);
+		/* No true literal and no undefined literal. This is a conflict
+		 * if ever I saw one! */
+		return false;
 	}
 
 	void detach(clause c)
