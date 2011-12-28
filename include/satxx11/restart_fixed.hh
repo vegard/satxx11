@@ -24,11 +24,13 @@ namespace satxx11 {
 template<unsigned int n>
 class restart_fixed {
 public:
-	restart_fixed()
+	template<class Solver>
+	restart_fixed(Solver &s)
 	{
 	}
 
-	unsigned int operator()()
+	template<class Solver>
+	unsigned int operator()(Solver &s)
 	{
 		return n;
 	}

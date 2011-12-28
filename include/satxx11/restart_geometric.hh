@@ -26,12 +26,14 @@ class restart_geometric {
 public:
 	double value;
 
-	restart_geometric():
+	template<class Solver>
+	restart_geometric(Solver &s):
 		value(initial)
 	{
 	}
 
-	unsigned int operator()()
+	template<class Solver>
+	unsigned int operator()(Solver &s)
 	{
 		unsigned int old_value = value;
 		value *= 1. * per / cent;

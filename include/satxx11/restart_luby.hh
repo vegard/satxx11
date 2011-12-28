@@ -39,12 +39,14 @@ private:
 public:
 	unsigned int counter;
 
-	restart_luby():
+	template<class Solver>
+	restart_luby(Solver &s):
 		counter(0)
 	{
 	}
 
-	unsigned int operator()()
+	template<class Solver>
+	unsigned int operator()(Solver &s)
 	{
 		return luby(++counter);
 	}

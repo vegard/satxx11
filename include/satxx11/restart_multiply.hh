@@ -27,13 +27,17 @@ public:
 	RestartA a;
 	RestartB b;
 
-	restart_multiply()
+	template<class Solver>
+	restart_multiply(Solver &s):
+		a(s),
+		b(s)
 	{
 	}
 
-	unsigned int operator()()
+	template<class Solver>
+	unsigned int operator()(Solver &s)
 	{
-		return a() * b();
+		return a(s) * b(s);
 	}
 };
 

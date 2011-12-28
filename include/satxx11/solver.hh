@@ -166,6 +166,7 @@ public:
 		analyze(*this),
 		send(*this),
 		receive(*this),
+		next_restart(*this),
 		reduce(*this)
 	{
 		for (unsigned int i = 0; i < nr_threads; ++i)
@@ -506,7 +507,7 @@ public:
 		if (!propagate.propagate(*this))
 			unsat();
 
-		unsigned int nr_conflicts = next_restart();
+		unsigned int nr_conflicts = next_restart(*this);
 		assert(nr_conflicts > 0);
 
 		while (!should_exit) {
@@ -646,7 +647,7 @@ public:
 
 				if (--nr_conflicts == 0) {
 					/* Restart */
-					nr_conflicts = next_restart();
+					nr_conflicts = next_restart(*this);
 					assert(nr_conflicts > 0);
 
 					if (!restart()) {
