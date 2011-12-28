@@ -30,6 +30,7 @@
 #include <satxx11/decide_random.hh>
 #include <satxx11/decide_vsids.hh>
 #include <satxx11/literal.hh>
+#include <satxx11/minimise_minisat.hh>
 #include <satxx11/plugin_list.hh>
 #include <satxx11/plugin_stdio.hh>
 #include <satxx11/propagate_watchlists.hh>
@@ -77,7 +78,7 @@ typedef std::vector<literal_vector> literal_vector_vector;
 template<class Random = std::ranlux24_base,
 	class Decide = decide_cached_polarity<decide_vsids<95>>,
 	class Propagate = propagate_watchlists<>,
-	class Analyze = analyze_1uip,
+	class Analyze = analyze_1uip<minimise_minisat>,
 	class Send = send_size<4>,
 	class Receive = receive_all,
 	class Restart = restart_multiply<restart_luby, restart_fixed<400>>,

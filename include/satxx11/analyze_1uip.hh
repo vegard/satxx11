@@ -28,8 +28,11 @@
 
 namespace satxx11 {
 
+template<class Minimise>
 class analyze_1uip {
 public:
+	Minimise minimise;
+
 	template<class Solver>
 	analyze_1uip(Solver &s)
 	{
@@ -48,7 +51,6 @@ public:
 
 		unsigned int counter = 0;
 		std::vector<literal> conflict_clause;
-		unsigned int new_decision_index = 0;
 
 		unsigned int variable;
 		clause reason = p.conflict_reason;
@@ -77,8 +79,6 @@ public:
 					} else if (level > 0) {
 						/* Exclude variables from decision level 0 */
 						conflict_clause.push_back(lit);
-						if (level > new_decision_index)
-							new_decision_index = level;
 					}
 				}
 			}
@@ -96,15 +96,13 @@ public:
 
 		literal asserting_literal = ~literal(variable, p.value(variable));
 
-		/* XXX: According to "A case for simple SAT solvers", we
-		 * should backtrack to the "next highest decision level" of
-		 * the learnt clause's literals. */
-		s.backtrack(new_decision_index);
+		if (conflict_clause.size() > 0)
+			minimise(s, seen, conflict_clause);
 
 		if (conflict_clause.size() == 0) {
-			assert(new_decision_index == 0);
-
 			debug("learnt = $", asserting_literal);
+
+			s.backtrack(0);
 
 			/* XXX: This can never fail, so we should not check
 			 * whether it does in the hotpath. */
@@ -114,10 +112,20 @@ public:
 			s.attach(asserting_literal);
 			s.share(asserting_literal);
 		} else {
+			unsigned int new_decision_index = 0;
+			for (literal l: conflict_clause) {
+				unsigned int level = s.propagate.levels[l.variable()];
+
+				if (level > new_decision_index)
+					new_decision_index = level;
+			}
+
 			conflict_clause.push_back(asserting_literal);
 
 			clause learnt_clause = s.allocate.allocate(s.nr_threads, s.id, true, conflict_clause);
 			debug("learnt = $", learnt_clause);
+
+			s.backtrack(new_decision_index);
 
 			/* Automatically force the opposite polarity for the last
 			 * variable (after backtracking its consequences). */
