@@ -34,21 +34,22 @@ public:
 	{
 	}
 
-	template<unsigned int I = 0, typename... Args>
-	typename std::enable_if<I == sizeof...(Args), void>::type call(std::tuple<Args...> &t)
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), void>::type call(Solver &s, std::tuple<Args...> &t)
 	{
 	}
 
-	template<unsigned int I = 0, typename... Args>
-	typename std::enable_if<I < sizeof...(Args), void>::type call(std::tuple<Args...> &t)
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), void>::type call(Solver &s, std::tuple<Args...> &t)
 	{
-		std::get<I>(t)();
-		call<I + 1>(t);
+		std::get<I>(t)(s);
+		call<Solver, I + 1>(s, t);
 	}
 
-	void operator()()
+	template<class Solver>
+	void operator()(Solver &s)
 	{
-		call(simplifies);
+		call(s, simplifies);
 	}
 };
 

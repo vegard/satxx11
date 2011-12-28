@@ -44,6 +44,7 @@
 #include <satxx11/restart_multiply.hh>
 #include <satxx11/send_size.hh>
 #include <satxx11/simplify_list.hh>
+#include <satxx11/simplify_failed_literal_probing.hh>
 
 /* Workaround for missing implementation in libstdc++ for gcc 4.6. */
 namespace std {
@@ -84,7 +85,7 @@ template<class Random = std::ranlux24_base,
 	class Receive = receive_all,
 	class NextRestart = restart_multiply<restart_luby, restart_fixed<400>>,
 	class Reduce = reduce_size<2>,
-	class Simplify = simplify_list<>,
+	class Simplify = simplify_list<simplify_failed_literal_probing>,
 	class Plugin = plugin_list<plugin_stdio>>
 class solver {
 public:
@@ -422,6 +423,7 @@ public:
 		 * the stdout plugin from seeing backtrack(0) in every restart,
 		 * and always printing 0 as the minimum backtrack level. */
 		plugin.restart(*this);
+		simplify(*this);
 
 		/* XXX: This might change if/when we figure out that we
 		 * want to and can attach clauses at other times than a
@@ -545,6 +547,11 @@ public:
 
 		if (!propagate.propagate(*this))
 			unsat();
+
+		/* Simplify the instance before doing anything else. */
+		/* XXX: Maybe this should really be a restart? We need to signal
+		 * the other plugins too in any case. */
+		simplify(*this);
 
 		unsigned int nr_conflicts = next_restart(*this);
 		assert(nr_conflicts > 0);
