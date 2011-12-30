@@ -31,6 +31,26 @@ public:
 	{
 	}
 
+	template<class Solver>
+	void assign(Solver &s, unsigned int variable, bool value)
+	{
+	}
+
+	template<class Solver>
+	void unassign(Solver &s, unsigned int variable)
+	{
+	}
+
+	template<class Solver>
+	void resolve(Solver &s, literal l)
+	{
+	}
+
+	template<class Solver>
+	void resolve(Solver &s, clause c)
+	{
+	}
+
 	void attach(clause c)
 	{
 	}
@@ -40,7 +60,12 @@ public:
 	}
 
 	template<class Solver>
-	literal operator()(Solver &s)
+	void conflict(Solver &s)
+	{
+	}
+
+	template<class Solver>
+	unsigned int operator()(Solver &s)
 	{
 		assert(s.propagate.trail_index < s.nr_variables);
 
@@ -52,7 +77,7 @@ public:
 			variable = s.random() % s.nr_variables;
 		} while (s.defined(variable));
 
-		return literal(variable, s.random() % 2);
+		return variable;
 	}
 };
 
