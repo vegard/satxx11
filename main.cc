@@ -306,6 +306,9 @@ int main(int argc, char *argv[])
 	for (unsigned int i = 0; i < nr_threads; ++i)
 		threads[i]->join();
 
+	for (unsigned int i = 0; i < nr_threads; ++i)
+		delete solvers[i];
+
 	{
 		struct rusage usage;
 		int err = getrusage(RUSAGE_SELF, &usage);
