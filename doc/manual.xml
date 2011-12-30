@@ -107,15 +107,47 @@ p cnf 3 4
 
 		<chapter>
 			<title>Overview</title>
-			<para>TODO</para>
+			<para>The plugin architecture of <application>SAT++11</application> is what allows us to modify and extend the solver and its heuristics. In fact, more than that, even the very core of the solver, the propagation engine, is a plugin that can be replaced by another.</para>
+			<para>Now, you may ask what the point of having a plugin architecture really is. Can't we just edit <filename>Solver.cpp</filename> like we used to do with <application>MiniSat</application>? Well, as it turns out, that is a perfect recipe for making a mess. And, although the plugin architecture seems rigid, it actually allows us to do a lot more with less work on the part of the programmer. Consider for example that you would like to test your hypothesis about a brand new decision variable heuristic. In the old way of doing things, you would have to have a look around and look at all the parts that might be affected by the old heuristic; in fact, if you wanted to keep the other heuristic around so that you could switch between the two, you would end up having to keep track of the functions and data structures for both.</para>
+			<para>With the plugin architecture, creating a new decision variable heuristic is as simple as writing a new (template) class. The functions and data structures for the new plugin are entirely self-contained and there is no need to change any of the existing files. Moreover, if you don't want to use the old heuristic, you don't need to spend any time whatsoever on removing it. You simply have to pass your new heuristic to the solver instead of the old one.</para>
+			<para>Separation of duties is a very powerful concept, because it allows us to completely ignore other, irrelevant parts of a program. Not only that, but SAT solvers are increasingly complex beasts, and we absolutely need to keep track of less things at a time in order to stay in charge of our own programs. If we don't, we can have no hope of making any progress, except perhaps by chance.</para>
+			<para>Additionally, the plugin architecture of <application>SAT++11</application> is based on C++ templates, which means that there is absolutely zero runtime overhead compared with implementing everything in a single file or class. Since plugin selection happens at compile-time, there is no overhead from calling virtual functions (as, indeed, there are no virtual functions to begin with).</para>
+			<para>Now, there are two types of plugins: designated plugins (<xref linkend="designated-plugins" />), and generic plugins (<xref linkend="generic-plugins" />). In short, designated plugins are plugins with a certain predefined (“designated”) purpose, like plugins that implement the decision literal heuristic or the restart policy. Generic plugins, however, don't fulfill a particular required purpose, but extend the core functionality of the solver in various ways. Generic plugins typically listen to certain events and can interact with the environment (such as e.g. the plugin responsible for printing statistics to the console), or they implement algorithms that run in-between the regular DPLL-style searches (such as e.g. simplification passes).</para>
 		</chapter>
 
-		<chapter>
+		<chapter id="designated-plugins">
 			<title>Designated plugins</title>
-			<para>TODO</para>
+			<para>Designated plugins are plugins with a certain predefined purpose. For the moment, the <literal>class solver</literal> takes the following types of designated plugins as its arguments:</para>
+			<variablelist>
+				<varlistentry><term>Random</term><listitem><para>Random number generator. Any of the standard C++11 random number generators (e.g. <literal>std::minstd_rand</literal>, <literal>std::ranlux24_base</literal>, or <literal>std::mt19937</literal>) will do.</para></listitem></varlistentry>
+				<varlistentry><term>Decide</term><listitem><para>Decision literal heuristic.</para></listitem></varlistentry>
+				<varlistentry><term>Propagate</term><listitem><para>Propagation engine.</para></listitem></varlistentry>
+				<varlistentry><term>Analyze</term><listitem><para>Conflict analysis engine.</para></listitem></varlistentry>
+				<varlistentry><term>Send</term><listitem><para>Outgoing-clause sharing heuristic.</para></listitem></varlistentry>
+				<varlistentry><term>Receive</term><listitem><para>Incoming-clause acceptance heuristic.</para></listitem></varlistentry>
+				<varlistentry><term>NextRestart</term><listitem><para>Restart policy.</para></listitem></varlistentry>
+				<varlistentry><term>Reduce</term><listitem><para>Clause database reduction heuristic.</para></listitem></varlistentry>
+				<varlistentry><term>Simplify</term><listitem><para>Simplification passes. More than one type of simplification pass can be used at a time using <literal>simplify_list&lt;&gt;</literal>.</para></listitem></varlistentry>
+				<varlistentry><term>Plugin</term><listitem><para>Generic plugins. More than one generic plugin can be used at a time using <literal>plugin_list&lt;&gt;</literal>.</para></listitem></varlistentry>
+			</variablelist>
+			<example>
+				<title>Example <literal>solver</literal> configuration</title>
+				<programlisting>using namespace satxx11;
+
+typedef solver&lt;ranlux24_base,
+    decide_cached_polarity&lt;decide_vsids&lt;95&gt;&gt;,
+    propagate_watchlists&lt;&gt;,
+    analyze_1uip&lt;minimise_minisat&gt;,
+    send_size&lt;4&gt;
+    receive_all,
+    restart_multiply&lt;restart_luby, restart_fixed&lt;400&gt;&gt;,
+    reduce_size&lt;2&gt;
+    simplify_failed_literal_probing,
+    plugin_list&lt;plugin_stdio&gt;&gt; my_solver&gt;</programlisting>
+			</example>
 		</chapter>
 
-		<chapter>
+		<chapter id="generic-plugins">
 			<title>Generic plugins</title>
 			<para>TODO</para>
 		</chapter>
@@ -133,12 +165,7 @@ p cnf 3 4
 			<title>Branching literal heuristics</title>
 
 			<section>
-				<title><literal>decide_vsids</literal></title>
-				<para>TODO</para>
-			</section>
-
-			<section>
-				<title><literal>decide_random</literal></title>
+				<title><literal>decide_cached_polarity</literal></title>
 				<para>TODO</para>
 			</section>
 		</chapter>
@@ -147,7 +174,12 @@ p cnf 3 4
 			<title>Branching variable heuristics</title>
 
 			<section>
-				<title><literal>decide_cached_polarity</literal></title>
+				<title><literal>decide_vsids</literal></title>
+				<para>TODO</para>
+			</section>
+
+			<section>
+				<title><literal>decide_random</literal></title>
 				<para>TODO</para>
 			</section>
 		</chapter>
@@ -299,7 +331,7 @@ p cnf 3 4
 				<section>
 					<title>Example</title>
 					<figure>
-						<title>Example output</title>
+						<title>Example GraphViz output</title>
 						<graphic fileref="graph.png" />
 					</figure>
 				</section>
