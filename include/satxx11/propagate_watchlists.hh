@@ -216,7 +216,7 @@ public:
 			 * must be implied. */
 			/* XXX: implication() assumes the literal may be defined or undefined. From
 			 * this particular callsite it is always undefined, so we could optimize it. */
-			return implication(s, c[found_undefined], c);
+			return s.implication(c[found_undefined], c);
 		}
 
 		/* No true literal and no undefined literal. This is a conflict
@@ -324,7 +324,7 @@ public:
 		/* There was no other watch to replace the one we just
 		 * falsified; therefore, the other watched literal must
 		 * be satisfied (this is the implication). */
-		return debug_return(implication(s, c[wi[!watch]], c), "$");
+		return debug_return(s.implication(c[wi[!watch]], c), "$");
 	}
 
 	/* Return false if and only if there was a conflict. */

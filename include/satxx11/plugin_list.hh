@@ -161,6 +161,24 @@ public:
 	}
 
 	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), void>::type implication(Solver &s, std::tuple<Args...> &args, literal lit, clause reason)
+	{
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), void>::type implication(Solver &s, std::tuple<Args...> &args, literal lit, clause reason)
+	{
+		std::get<I>(args).implication(s, lit, reason);
+		implication<Solver, I + 1>(s, args, lit, reason);
+	}
+
+	template<class Solver>
+	void implication(Solver &s, literal lit, clause reason)
+	{
+		implication(s, plugins, lit, reason);
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
 	typename std::enable_if<I == sizeof...(Args), void>::type conflict(Solver &s, std::tuple<Args...> &args)
 	{
 	}

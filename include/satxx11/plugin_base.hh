@@ -62,6 +62,11 @@ public:
 	}
 
 	template<class Solver>
+	void implication(Solver &s, literal lit, clause reason)
+	{
+	}
+
+	template<class Solver>
 	void conflict(Solver &s)
 	{
 	}

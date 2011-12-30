@@ -331,6 +331,12 @@ public:
 		plugin.decision(*this, lit);
 	}
 
+	bool implication(literal lit, clause reason)
+	{
+		plugin.implication(*this, lit, reason);
+		return propagate.implication(*this, lit, reason);
+	}
+
 	/* XXX: The name is a bit misleading... */
 	void resolve(literal l)
 	{
