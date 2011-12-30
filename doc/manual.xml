@@ -12,6 +12,7 @@
 		</affiliation>
 	</bookinfo>
 
+<!--
 	<preface>
 		<title>Preface</title>
 
@@ -19,40 +20,113 @@
 			<simpara>ssdfsdf</simpara>
 		</abstract>
 	</preface>
+-->
 
 	<part>
 		<title>Introduction</title>
+
 		<chapter>
-			<title>TODO</title>
-			<para>TODO</para>
+			<title>Overview</title>
+			<para>This is the manual for the software program/project <application>SAT++11</application> (sometimes written <application>satxx11</application>). <application>SAT++11</application> aims to be a fast, scalable, and extensible parallel SAT solver. Efficient compile-time extensibility is one of the most important features of the code base, and we achieve it through creative use of C++ template metaprogramming. In fact, we rely on many of the features of the new C++ language standard, C++11, a fact which is reflected in the name of the solver.</para>
+			<para>The first part of this manual (<xref linkend="usage" />) describes how to build the solver program and how to run it. The second part (<xref linkend="plugin-architecture" />) is a reference to the plugin architecture that allows one to write compile-time extensions for the solver, including a tutorial that explains the process of writing a plugin step by step. The last part (<xref linkend="builtins" />) is a reference to the built-in plugins that are bundled with the solver core.</para>
+			<para>Although the solver was written from scratch, many algorithms, heuristics, and techniques were heavily inspired by (and sometimes copied from) their respective counterparts in other, already existing SAT solvers like Chaff, MiniSat, CryptoMiniSat, lingeling, and SAT4J. The main contribution of <application>SAT++11</application> is to bring the extensibility of SAT4J together with the raw efficiency of C++ solvers like MiniSat.</para>
 		</chapter>
 	</part>
 
-	<part>
+	<part id="usage">
 		<title>Usage</title>
+
 		<chapter>
-			<title>TODO</title>
-			<para>TODO</para>
+			<title>Building the solver</title>
+			<para>Before <application>SAT++11</application> can be compiled, the following prerequisites must be installed:</para>
+			<itemizedlist>
+				<listitem><para>Boost.Program_options (<filename>libboost-program-options-dev</filename>)</para></listitem>
+				<listitem><para>Git (<filename>git</filename>)</para></listitem>
+				<listitem><para>GNU C++ Compiler (<filename>gcc</filename>)</para></listitem>
+			</itemizedlist>
+			<para>To compile the solver, simply run the following command in the top-level project directory:</para>
+			<para><userinput>bash make.sh</userinput></para>
+		</chapter>
+
+		<chapter>
+			<title>Building the documentation</title>
+			<para>In order to build the documentation, the following prerequisites must be installed:</para>
+			<itemizedlist>
+				<listitem><para>Docbook (<filename>docbook</filename>, <filename>docbook-xsl</filename>)</para></listitem>
+				<listitem><para>Doxygen (<filename>doxygen</filename>)</para></listitem>
+				<listitem><para>Libxslt1.1 (<filename>libxslt1.1</filename>)</para></listitem>
+				<listitem><para>xmlto (<filename>xmlto</filename>)</para></listitem>
+			</itemizedlist>
+			<para>To compile the API reference, run the following command in the top-level project directory:</para>
+			<para><userinput>doxygen</userinput></para>
+			<para>The generated files can be found in <filename>doc/html/</filename>.</para>
+			<para>To compile the manual, run the following commands in the top-level project directory:</para>
+			<para><userinput>cd doc &amp;&amp; bash make.sh</userinput></para>
+			<para>The generated files can be found in <filename>doc/manual/</filename>.</para>
+		</chapter>
+
+		<chapter>
+			<title>Running the solver</title>
+
+			<section>
+				<title>Command-line options</title>
+				<warning><para>This list of options may not be complete or up to date. Please also check the output of <userinput>./solver --help</userinput> for additional options.</para></warning>
+				<variablelist>
+					<varlistentry><term><userinput>--keep-going</userinput></term><listitem><para>Find all solutions</para></listitem></varlistentry>
+					<varlistentry><term><userinput>--threads arg</userinput></term><listitem><para>Number of threads (default: number of available cores)</para></listitem></varlistentry>
+					<varlistentry><term><userinput>--seed arg</userinput></term><listitem><para>Random number generator seed (default: current time)</para></listitem></varlistentry>
+				</variablelist>
+			</section>
+
+			<section>
+				<title>Example</title>
+				<para>To find all solutions to the input file <filename>~/sha1.cnf</filename> using 4 threads, run the command:</para>
+				<para><userinput>./solver --keep-going --threads 4 ~/sha1.cnf</userinput></para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Input file format</title>
+			<para>As the main rule, input files to the solver are given in the traditional DIMACS CNF format. In general, this is a line-oriented plaintext format, meaning that each line of input is parsed as a unit. At the beginning of the file, we may have any number of comment lines; these lines start with a <literal>c</literal>. Following the comments (if any), there comes exactly one problem line; this line starts with a <literal>p</literal> and two numeric parameters. The first parameter is the number of variables in the instance, and the second parameter is the number of clauses. After the problem line follows the clauses of the instance. Each clause is a space-separated list of literals ending in <literal>0</literal>. Negative literals consist of <literal>-</literal> followed by the variable number, while positive literals consist only of the variable number.</para>
+			<para>Additionally, in the traditional DIMACS CNF format, variables are numbered from 1 to the number of variables, inclusive. However, we are not so strict with variable numbering. In fact, we are not strict at all. Comment lines may appear anywhere in the file, the problem line is entirely optional, and variables need not be numbered sequentially.</para>
+			<example>
+				<title>Example CNF file</title>
+				<programlisting>c An example CNF file
+p cnf 3 4
+1 -2 0
+-1 2 0
+-2 3 0
+1 2 3 0</programlisting>
+			</example>
+			<para>In the future, we might support additional types of constraints, e.g. parity constraints, cardinality constraints, or linear zero-one constraints.</para>
 		</chapter>
 	</part>
 
-	<part>
+	<part id="plugin-architecture">
 		<title>Plugin architecture</title>
+
 		<chapter>
 			<title>Overview</title>
 			<para>TODO</para>
 		</chapter>
+
 		<chapter>
 			<title>Designated plugins</title>
 			<para>TODO</para>
 		</chapter>
+
 		<chapter>
 			<title>Generic plugins</title>
 			<para>TODO</para>
 		</chapter>
+
+		<chapter>
+			<title>Tutorial: Writing a plugin</title>
+			<para>TODO</para>
+		</chapter>
 	</part>
 
-	<part>
+	<part id="builtins">
 		<title>Built-in plugins</title>
 
 		<chapter>
@@ -219,7 +293,7 @@
 					<title>Description</title>
 					<para>The <literal>plugin_graphviz</literal> plugin constructs a <application>GraphViz</application> graph, written to the files <filename>graph-0.dot</filename>, <filename>graph-1.dot</filename>, etc. (where 0, 1, etc. are the thread indices).</para>
 					<para>To plot the <filename>.dot</filename> files, use the <command>dot</command> command like this:</para>
-					<para><command>dot -Tpdf &lt; graph-0.dot &gt; graph-0.pdf</command></para>
+					<para><userinput>dot -Tpdf &lt; graph-0.dot &gt; graph-0.pdf</userinput></para>
 				</section>
 
 				<section>
