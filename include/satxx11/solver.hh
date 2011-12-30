@@ -32,6 +32,7 @@
 #include <satxx11/literal.hh>
 #include <satxx11/minimise_minisat.hh>
 #include <satxx11/minimise_noop.hh>
+#include <satxx11/plugin_graphviz.hh>
 #include <satxx11/plugin_list.hh>
 #include <satxx11/plugin_stdio.hh>
 #include <satxx11/propagate_watchlists.hh>
