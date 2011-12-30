@@ -1,0 +1,235 @@
+<?xml version='1.0'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN" "file:///usr/share/xml/docbook/schema/dtd/4.5/docbookx.dtd">
+<book>
+	<title>SAT++11 Manual</title>
+	<bookinfo>
+		<author>
+			<firstname>Vegard</firstname>
+			<surname>Nossum</surname>
+		</author>
+		<affiliation>
+			<address><email>vegardno@ifi.uio.no</email></address>
+		</affiliation>
+	</bookinfo>
+
+	<preface>
+		<title>Preface</title>
+
+		<abstract>
+			<simpara>ssdfsdf</simpara>
+		</abstract>
+	</preface>
+
+	<part>
+		<title>Introduction</title>
+		<chapter>
+			<title>TODO</title>
+			<para>TODO</para>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Usage</title>
+		<chapter>
+			<title>TODO</title>
+			<para>TODO</para>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Plugin architecture</title>
+		<chapter>
+			<title>Overview</title>
+			<para>TODO</para>
+		</chapter>
+		<chapter>
+			<title>Designated plugins</title>
+			<para>TODO</para>
+		</chapter>
+		<chapter>
+			<title>Generic plugins</title>
+			<para>TODO</para>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Built-in plugins</title>
+
+		<chapter>
+			<title>Branching literal heuristics</title>
+
+			<section>
+				<title><literal>decide_vsids</literal></title>
+				<para>TODO</para>
+			</section>
+
+			<section>
+				<title><literal>decide_random</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Branching variable heuristics</title>
+
+			<section>
+				<title><literal>decide_cached_polarity</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Propagation engines</title>
+
+			<section>
+				<title><literal>propagate_watchlists</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Conflict analysis engines</title>
+
+			<section>
+				<title><literal>analyze_1uip</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Conflict clause minimisation engines</title>
+
+			<section>
+				<title><literal>minimise_minisat</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>minimise_noop</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Clause sharing heuristics</title>
+
+			<section>
+				<title><literal>send_size</literal></title>
+				<para>TODO</para>
+			</section>
+
+			<section>
+				<title><literal>receive_all</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Restart heuristics</title>
+
+			<section>
+				<title><literal>restart_luby</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>restart_geometric</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>restart_random</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>restart_fixed</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>restart_multiply</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Clause removal heuristics</title>
+
+			<section>
+				<title><literal>reduce_noop</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>reduce_size</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Simplification schemes</title>
+
+			<section>
+				<title><literal>simplify_failed_literal_probing</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>simplify_list</literal></title>
+				<para>TODO</para>
+			</section>
+		</chapter>
+
+		<chapter>
+			<title>Generic plugins</title>
+
+			<section>
+				<title><literal>plugin_base</literal></title>
+
+				<section>
+					<title>Synopsis</title>
+					<para><code>plugin_base</code></para>
+				</section>
+
+				<section>
+					<title>Description</title>
+					<para>The <literal>plugin_base</literal> plugin is not meant to do anything by itself; instead, it provides empty implementations of all the event handlers for generic plugins so that other plugins do not need to provide their own empty implementations of unused event handlers.</para>
+				</section>
+			</section>
+			<section>
+				<title><literal>plugin_list</literal></title>
+
+				<section>
+					<title>Synopsis</title>
+					<para><code>plugin_list&lt;plugin1, plugin2, ...&gt;</code></para>
+				</section>
+
+				<section>
+					<title>Description</title>
+					<para>The <literal>plugin_list</literal> plugin dispatches all events to the plugins <code>plugin1</code>, <code>plugin2</code>, etc. If the list of plugins is empty, this plugin is effectively a no-op.</para>
+				</section>
+			</section>
+			<section>
+				<title><literal>plugin_stdio</literal></title>
+				<para>TODO</para>
+			</section>
+			<section>
+				<title><literal>plugin_graphviz</literal></title>
+
+				<section>
+					<title>Synopsis</title>
+					<para><code>plugin_graphviz&lt;bool show_implications = false&gt;</code></para>
+				</section>
+
+				<section>
+					<title>Description</title>
+					<para>The <literal>plugin_graphviz</literal> plugin constructs a <application>GraphViz</application> graph, written to the files <filename>graph-0.dot</filename>, <filename>graph-1.dot</filename>, etc. (where 0, 1, etc. are the thread indices).</para>
+					<para>To plot the <filename>.dot</filename> files, use the <command>dot</command> command like this:</para>
+					<para><command>dot -Tpdf &lt; graph-0.dot &gt; graph-0.pdf</command></para>
+				</section>
+
+				<section>
+					<title>Example</title>
+					<figure>
+						<title>Example output</title>
+						<graphic fileref="graph.png" />
+					</figure>
+				</section>
+			</section>
+		</chapter>
+	</part>
+</book>

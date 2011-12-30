@@ -1,2 +1,4 @@
 .*
 solver
+
+doc/manual/*.html
