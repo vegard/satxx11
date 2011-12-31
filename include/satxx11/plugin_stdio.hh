@@ -49,6 +49,7 @@ public:
 	unsigned int nr_clause_1;
 	unsigned int nr_clause_2;
 	unsigned int nr_clause_3;
+	unsigned int nr_clause_greater;
 
 	void header()
 	{
@@ -60,7 +61,7 @@ public:
 		printf("c  |    |      |      |        Backtrack level (min/avg/max)\n");
 		printf("c  |    |      |      |        |             Learnt clauses (attached/detached)\n");
 		printf("c  |    |      |      |        |             |             Clause length (min/avg/max)\n");
-		printf("c  |    |      |      |        |             |             |           Learnt clauses (size 1/2/3)\n");
+		printf("c  |    |      |      |        |             |             |           Learnt clauses (size 1/2/3/4+)\n");
 		printf("c  |    |      |      |        |             |             |           |\n");
 	}
 
@@ -68,7 +69,8 @@ public:
 		nr_restarts(0),
 		nr_clause_1(0),
 		nr_clause_2(0),
-		nr_clause_3(0)
+		nr_clause_3(0),
+		nr_clause_greater(0)
 	{
 		init();
 	}
@@ -132,8 +134,10 @@ public:
 
 		if (n == 2)
 			++nr_clause_2;
-		if (n == 3)
+		else if (n == 3)
 			++nr_clause_3;
+		else if (n >= 4)
+			++nr_clause_greater;
 	}
 
 	template<class Solver>
@@ -180,13 +184,13 @@ public:
 			header();
 		}
 
-		printf("c %2u: %3u %6u %6u %3u/%06.2f/%-3u %6u/%-6u %2u/%06.2f/%-3u %2u/%2u/%2u\n",
+		printf("c %2u: %3u %6u %6u %3u/%06.2f/%-3u %6u/%-6u %2u/%06.2f/%-3u %2u/%2u/%2u/%2u\n",
 			s.id,
 			nr_restarts, nr_conflicts, nr_decisions,
 			min_backtrack_level, avg_backtrack_level, max_backtrack_level,
 			nr_learnt_clauses_attached, nr_learnt_clauses_detached,
 			min_clause_length, avg_clause_length, max_clause_length,
-			nr_clause_1, nr_clause_2, nr_clause_3);
+			nr_clause_1, nr_clause_2, nr_clause_3, nr_clause_greater);
 
 		init();
 	}
