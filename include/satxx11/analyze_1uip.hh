@@ -38,22 +38,22 @@ public:
 	{
 	}
 
-	template<class Solver, class Propagate>
-	void operator()(Solver &s, Propagate &p)
+	template<class Solver>
+	void operator()(Solver &s)
 	{
 		/* This algorithm comes from the MiniSat paper:
 		 * http://minisat.se/downloads/MiniSat.pdf */
 
 		std::vector<bool> seen(s.nr_variables, false);
 
-		assert(p.decision_index > 0);
-		unsigned int trail_index = p.trail_size;
+		assert(s.propagate.decision_index > 0);
+		unsigned int trail_index = s.propagate.trail_size;
 
 		unsigned int counter = 0;
 		std::vector<literal> conflict_clause;
 
 		unsigned int variable;
-		clause reason = p.conflict_reason;
+		clause reason = s.propagate.conflict_reason;
 
 		do {
 			assert(reason);
@@ -73,8 +73,8 @@ public:
 					seen[variable] = true;
 					s.resolve(lit);
 
-					unsigned int level = p.levels[variable];
-					if (level == p.decision_index) {
+					unsigned int level = s.propagate.levels[variable];
+					if (level == s.propagate.decision_index) {
 						++counter;
 					} else if (level > 0) {
 						/* Exclude variables from decision level 0 */
@@ -85,10 +85,10 @@ public:
 
 			do {
 				assert_hotpath(trail_index > 0);
-				variable = p.trail[--trail_index];
+				variable = s.propagate.trail[--trail_index];
 			} while (!seen[variable]);
 
-			reason = p.reasons[variable];
+			reason = s.propagate.reasons[variable];
 
 			assert_hotpath(counter > 0);
 			--counter;

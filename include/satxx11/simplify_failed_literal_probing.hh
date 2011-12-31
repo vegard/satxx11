@@ -49,7 +49,7 @@ public:
 
 			s.propagate.decision(s, literal(var, value));
 			while (!s.propagate.propagate(s)) {
-				s.analyze(s, s.propagate);
+				s.analyze(s);
 				++nr_literals;
 			}
 

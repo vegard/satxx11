@@ -711,7 +711,7 @@ public:
 					break;
 				}
 
-				analyze(*this, propagate);
+				analyze(*this);
 			}
 
 #if 0
