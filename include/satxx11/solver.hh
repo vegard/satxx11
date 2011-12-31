@@ -168,7 +168,7 @@ public:
 
 		random(seed),
 		decide(*this),
-		propagate(nr_threads, variables.size()),
+		propagate(*this),
 		analyze(*this),
 		send(*this),
 		receive(*this),

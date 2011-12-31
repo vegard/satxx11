@@ -44,7 +44,7 @@ public:
 		/* This algorithm comes from the MiniSat paper:
 		 * http://minisat.se/downloads/MiniSat.pdf */
 
-		std::vector<bool> seen(p.nr_variables, false);
+		std::vector<bool> seen(s.nr_variables, false);
 
 		assert(p.decision_index > 0);
 		unsigned int trail_index = p.trail_size;

@@ -49,8 +49,6 @@ public:
 	static_assert(propagate_prefetch_watchlist < propagate_prefetch_clause,
 		"propagate_prefetch_watchlist < propagate_prefetch_clause");
 
-	unsigned int nr_variables;
-
 	/* XXX: Maybe put this in its own class using uint8 or something. */
 	watchlist *watchlists;
 
@@ -74,17 +72,17 @@ public:
 	literal conflict_literal;
 	clause conflict_reason;
 
-	propagate_watchlists(unsigned int nr_threads, unsigned int nr_variables):
-		nr_variables(nr_variables),
-		watchlists(new watchlist[2 * nr_variables]),
-		watches(new std::vector<watch_indices>[nr_threads]),
-		trail(new unsigned int[nr_variables]),
+	template<class Solver>
+	propagate_watchlists(Solver &s):
+		watchlists(new watchlist[2 * s.nr_variables]),
+		watches(new std::vector<watch_indices>[s.nr_threads]),
+		trail(new unsigned int[s.nr_variables]),
 		trail_index(0),
 		trail_size(0),
-		decisions(new unsigned int[nr_variables]),
+		decisions(new unsigned int[s.nr_variables]),
 		decision_index(0),
-		reasons(new clause[nr_variables]),
-		levels(new unsigned int[nr_variables])
+		reasons(new clause[s.nr_variables]),
+		levels(new unsigned int[s.nr_variables])
 	{
 	}
 
