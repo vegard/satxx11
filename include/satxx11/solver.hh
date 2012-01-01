@@ -35,7 +35,7 @@
 #include <satxx11/plugin_graphviz.hh>
 #include <satxx11/plugin_list.hh>
 #include <satxx11/plugin_stdio.hh>
-#include <satxx11/propagate_watchlists.hh>
+#include <satxx11/propagate_clause.hh>
 #include <satxx11/receive_all.hh>
 #include <satxx11/reduce_noop.hh>
 #include <satxx11/reduce_size.hh>
@@ -81,7 +81,7 @@ typedef std::vector<literal_vector> literal_vector_vector;
 template<class ReasonType,
 	class Random = std::ranlux24_base,
 	class Decide = decide_cached_polarity<decide_vsids<95>>,
-	class Propagate = propagate_watchlists<>,
+	class Propagate = propagate_clause<>,
 	class Analyze = analyze_1uip<minimise_minisat>,
 	class Send = send_size<4>,
 	class Receive = receive_all,

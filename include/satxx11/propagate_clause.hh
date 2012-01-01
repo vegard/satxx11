@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SATXX11_PROPAGATE_WATCHLISTS_HH
-#define SATXX11_PROPAGATE_WATCHLISTS_HH
+#ifndef SATXX11_PROPAGATE_CLAUSE_HH
+#define SATXX11_PROPAGATE_CLAUSE_HH
 
 #include <cstdint>
 #include <cstdio>
@@ -42,7 +42,7 @@ template<unsigned int propagate_prefetch_first_clause = 2,
 	/* We tested baseline (138s), +4 (121s), +5 (110s),
 	 * and +6 (112s). */
 	unsigned int propagate_prefetch_clause = 5>
-class propagate_watchlists {
+class propagate_clause {
 public:
 	static_assert(propagate_prefetch_first_clause < propagate_prefetch_watchlist,
 		"propagate_prefetch_first_clause < propagate_prefetch_watchlist");
@@ -66,7 +66,7 @@ public:
 	unsigned int *levels;
 
 	template<class Solver>
-	propagate_watchlists(Solver &s):
+	propagate_clause(Solver &s):
 		watchlists(new watchlist[2 * s.nr_variables]),
 		watches(new std::vector<watch_indices>[s.nr_threads]),
 		trail(new unsigned int[s.nr_variables]),
@@ -78,7 +78,7 @@ public:
 	{
 	}
 
-	~propagate_watchlists()
+	~propagate_clause()
 	{
 		delete[] watchlists;
 		delete[] watches;
