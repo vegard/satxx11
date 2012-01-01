@@ -47,7 +47,7 @@ public:
 	}
 
 	template<class Solver>
-	void resolve(Solver &s, clause c)
+	void resolve(Solver &s, const std::vector<literal> &v)
 	{
 	}
 

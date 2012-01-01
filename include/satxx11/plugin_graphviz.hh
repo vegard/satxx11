@@ -79,7 +79,7 @@ public:
 	}
 
 	template<class Solver>
-	void implication(Solver &s, literal lit, clause reason)
+	void implication(Solver &s, literal lit, typename Solver::reason_type reason)
 	{
 		if (!show_implications)
 			return;

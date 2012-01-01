@@ -131,8 +131,37 @@ static void solve(t *s, const std::vector<literal> &literals, const std::vector<
 	s->run(literals, clauses);
 }
 
+class reason {
+public:
+	clause clause_data;
+
+	reason()
+	{
+	}
+
+	reason(clause c):
+		clause_data(c)
+	{
+	}
+
+	void get_literals(std::vector<literal> &v) const
+	{
+		assert_hotpath(clause_data);
+
+		v.clear();
+		clause_data.get_literals(v);
+	}
+
+	operator bool() const
+	{
+		return clause_data;
+	}
+};
+
 int main(int argc, char *argv[])
 {
+	typedef solver<reason> my_solver;
+
 	struct timeval time_start;
 	{
 		int err = gettimeofday(&time_start, NULL);
@@ -217,7 +246,7 @@ int main(int argc, char *argv[])
 			printf("c sizeof(clause) = %lu\n", sizeof(clause));
 			printf("c sizeof(clause::impl) = %lu\n", sizeof(clause::impl));
 			printf("c sizeof(literal) = %lu\n", sizeof(literal));
-			printf("c sizeof(solver<>) = %lu\n", sizeof(solver<>));
+			printf("c sizeof(my_solver) = %lu\n", sizeof(my_solver));
 			printf("c sizeof(watch_indices) = %lu\n", sizeof(watch_indices));
 			printf("c sizeof(watchlist) = %lu\n", sizeof(watchlist));
 			return 0;
@@ -282,9 +311,9 @@ int main(int argc, char *argv[])
 	 * layer of indirection sometimes. But it makes construction difficult,
 	 * unless we separate some of the initialisation from construction, which
 	 * is admittedly ugly. */
-	solver<> *solvers[nr_threads];
+	my_solver *solvers[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i)
-		solvers[i] = new solver<>(nr_threads, solvers, i, keep_going, should_exit, seed + i, variables, reverse_variables, clauses);
+		solvers[i] = new my_solver(nr_threads, solvers, i, keep_going, should_exit, seed + i, variables, reverse_variables, clauses);
 
 	std::vector<literal> literals;
 	std::vector<clause> shared_clauses;
@@ -300,7 +329,7 @@ int main(int argc, char *argv[])
 	/* Start threads */
 	std::thread *threads[nr_threads];
 	for (unsigned int i = 0; i < nr_threads; ++i)
-		threads[i] = new std::thread(solve<solver<>>, solvers[i], literals, shared_clauses);
+		threads[i] = new std::thread(solve<my_solver>, solvers[i], literals, shared_clauses);
 
 	/* Wait for the solvers to finish/exit */
 	for (unsigned int i = 0; i < nr_threads; ++i)

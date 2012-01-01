@@ -152,6 +152,12 @@ public:
 		return data->literals[i];
 	}
 
+	void get_literals(std::vector<literal> &v) const
+	{
+		for (unsigned int i = 0, n = data->size; i < n; ++i)
+			v.push_back(data->literals[i]);
+	}
+
 	operator bool() const
 	{
 		return data;

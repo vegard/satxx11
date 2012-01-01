@@ -53,33 +53,31 @@ public:
 		std::vector<literal> conflict_clause;
 
 		unsigned int variable;
-		clause reason = s.propagate.conflict_reason;
+		std::vector<literal> reason;
+		s.conflict_reason.get_literals(reason);
 
-		do {
-			assert(reason);
-			debug("reason = $", reason);
-
+		while (true) {
 			/* Generic hook -- but our main intention is to let
 			 * the VSIDS heuristic bump the clause activity */
 			/* XXX: Ideally, we would also pass some information
 			 * like what it is resolved _with_... */
 			s.resolve(reason);
 
-			for (unsigned int i = 0; i < reason.size(); ++i) {
-				literal lit = reason[i];
+			for (literal lit: reason) {
 				unsigned int variable = lit.variable();
 
-				if (!seen[variable]) {
-					seen[variable] = true;
-					s.resolve(lit);
+				if (seen[variable])
+					continue;
 
-					unsigned int level = s.propagate.levels[variable];
-					if (level == s.propagate.decision_index) {
-						++counter;
-					} else if (level > 0) {
-						/* Exclude variables from decision level 0 */
-						conflict_clause.push_back(lit);
-					}
+				seen[variable] = true;
+				s.resolve(lit);
+
+				unsigned int level = s.propagate.levels[variable];
+				if (level == s.propagate.decision_index) {
+					++counter;
+				} else if (level > 0) {
+					/* Exclude variables from decision level 0 */
+					conflict_clause.push_back(lit);
 				}
 			}
 
@@ -88,11 +86,15 @@ public:
 				variable = s.propagate.trail[--trail_index];
 			} while (!seen[variable]);
 
-			reason = s.propagate.reasons[variable];
-
 			assert_hotpath(counter > 0);
 			--counter;
-		} while (counter > 0);
+
+			if (counter == 0)
+				break;
+
+			/* Get next clause */
+			s.reasons[variable].get_literals(reason);
+		}
 
 		literal asserting_literal = ~literal(variable, s.value(variable));
 

@@ -62,15 +62,8 @@ public:
 	unsigned int *decisions;
 	unsigned int decision_index;
 
-	/* Indexed by variable. Gives the reason why a variable was set
-	 * if the variable was implied. */
-	clause *reasons;
-
 	/* Decision level at which the variable was set. */
 	unsigned int *levels;
-
-	literal conflict_literal;
-	clause conflict_reason;
 
 	template<class Solver>
 	propagate_watchlists(Solver &s):
@@ -81,7 +74,6 @@ public:
 		trail_size(0),
 		decisions(new unsigned int[s.nr_variables]),
 		decision_index(0),
-		reasons(new clause[s.nr_variables]),
 		levels(new unsigned int[s.nr_variables])
 	{
 	}
@@ -244,7 +236,6 @@ public:
 		trail[trail_size] = variable;
 		decisions[decision_index] = trail_size;
 		++trail_size;
-		reasons[variable] = clause();
 		++decision_index;
 		levels[variable] = decision_index;
 	}
@@ -253,30 +244,17 @@ public:
 	 * variable may be defined already, in which case we have a conflict
 	 * and this function will return false. */
 	template<class Solver>
-	bool implication(Solver &s, literal lit, clause reason)
+	void implication(Solver &s, literal lit)
 	{
 		debug_enter("literal = $", lit);
 
-		if (s.defined(lit)) {
-			/* If it's already defined to have the right value,
-			 * we don't have a conflict. */
-			/* XXX: In this case, Minisat changes reasons[variable]
-			 * if the new reason is a smaller clause. */
-			if (s.value(lit))
-				return debug_return(true, "$ /* no conflict; already defined */");
-
-			conflict_literal = lit;
-			conflict_reason = reason;
-			return debug_return(false, "$ /* conflict */");
-		}
+		assert_hotpath(!s.defined(lit));
 
 		unsigned int variable = lit.variable();
 		s.assign(lit, true);
 		trail[trail_size] = variable;
 		++trail_size;
-		reasons[variable] = reason;
 		levels[variable] = decision_index;
-		return debug_return(true, "$ /* no conflict */");
 	}
 
 	/* Return false if and only if there was a conflict. */

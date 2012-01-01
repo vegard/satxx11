@@ -78,7 +78,8 @@ typedef std::map<variable, variable> variable_map;
 typedef std::vector<literal> literal_vector;
 typedef std::vector<literal_vector> literal_vector_vector;
 
-template<class Random = std::ranlux24_base,
+template<class ReasonType,
+	class Random = std::ranlux24_base,
 	class Decide = decide_cached_polarity<decide_vsids<95>>,
 	class Propagate = propagate_watchlists<>,
 	class Analyze = analyze_1uip<minimise_minisat>,
@@ -90,6 +91,8 @@ template<class Random = std::ranlux24_base,
 	class Plugin = plugin_list<plugin_stdio>>
 class solver {
 public:
+	typedef ReasonType reason_type;
+
 	unsigned int nr_threads;
 	solver **solvers;
 	unsigned int id;
@@ -101,6 +104,13 @@ public:
 	const literal_vector_vector &original_clauses;
 
 	std::vector<bool> valuation;
+
+	/* Indexed by variable. Gives the reason why a variable was set
+	 * if the variable was implied. */
+	reason_type *reasons;
+
+	literal conflict_literal;
+	reason_type conflict_reason;
 
 	clause_allocator allocate;
 
@@ -161,6 +171,7 @@ public:
 		original_clauses(original_clauses),
 
 		valuation(2 * nr_variables),
+		reasons(new reason_type[nr_variables]),
 
 		/* XXX: Not RAII. */
 		output(new message *[nr_threads]),
@@ -177,6 +188,10 @@ public:
 	{
 		for (unsigned int i = 0; i < nr_threads; ++i)
 			output[i] = new message();
+
+		/* XXX: Necessary? */
+		for (unsigned int i = 0; i < nr_variables; ++i)
+			reasons[i] = reason_type();
 	}
 
 	~solver()
@@ -328,14 +343,28 @@ public:
 
 	void decision(literal lit)
 	{
+		reasons[lit.variable()] = reason_type();
 		propagate.decision(*this, lit);
 		plugin.decision(*this, lit);
 	}
 
-	bool implication(literal lit, clause reason)
+	bool implication(literal lit, reason_type reason = reason_type())
 	{
+		if (defined(lit)) {
+			/* If it's already defined to have the right value,
+			 * we don't have a conflict. */
+			if (value(lit))
+				return true;
+
+			conflict_literal = lit;
+			conflict_reason = reason;
+			return false;
+		}
+
+		reasons[lit.variable()] = reason;
 		plugin.implication(*this, lit, reason);
-		return propagate.implication(*this, lit, reason);
+		propagate.implication(*this, lit);
+		return true;
 	}
 
 	/* XXX: The name is a bit misleading... */
@@ -345,10 +374,10 @@ public:
 	}
 
 	/* XXX: We would also like to know what we are resolving _with_... */
-	void resolve(clause c)
+	void resolve(const std::vector<literal> &v)
 	{
-		decide.resolve(*this, c);
-		reduce.resolve(*this, c);
+		decide.resolve(*this, v);
+		reduce.resolve(*this, v);
 	}
 
 	void conflict()
@@ -436,7 +465,7 @@ public:
 		 * want to and can attach clauses at other times than a
 		 * full restart. */
 		for (literal l: pending_literals) {
-			if (!propagate.implication(*this, l, clause()))
+			if (!implication(l))
 				return false;
 
 			attach(l);
@@ -543,7 +572,7 @@ public:
 
 		/* Queue unit clauses */
 		for (literal l: literals) {
-			if (!propagate.implication(*this, l, clause())) {
+			if (!implication(l)) {
 				unsat();
 				break;
 			}
@@ -661,7 +690,7 @@ public:
 				if (conflict_clause.size() == 1) {
 					/* XXX: This can never fail, so we should not check
 					 * whether it does in the hotpath. */
-					bool ret = propagate.implication(*this, conflict_clause[0], clause());
+					bool ret = implication(conflict_clause[0]);
 					assert(ret);
 
 					if (!propagate.propagate(*this)) {

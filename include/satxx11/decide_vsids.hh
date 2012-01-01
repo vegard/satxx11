@@ -211,10 +211,10 @@ public:
 	}
 
 	template<class Solver>
-	void resolve(Solver &s, clause c)
+	void resolve(Solver &s, const std::vector<literal> &v)
 	{
-		for (unsigned int i = 0, n = c.size(); i < n; ++i)
-			bump(c[i]);
+		for (literal lit: v)
+			bump(lit);
 	}
 
 	void attach(clause c)

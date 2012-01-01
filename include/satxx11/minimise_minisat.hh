@@ -52,11 +52,12 @@ public:
 			unsigned int var = agenda.top();
 			agenda.pop();
 
-			clause c = s.propagate.reasons[var];
-			assert_hotpath(c);
+			std::vector<literal> reason;
 
-			for (unsigned int i = 0, n = c.size(); i < n; ++i) {
-				literal lit = c[i];
+			assert_hotpath(s.reasons[var]);
+			s.reasons[var].get_literals(reason);
+
+			for (literal lit: reason) {
 				unsigned int var = lit.variable();
 
 				if (seen[var])
@@ -67,7 +68,7 @@ public:
 				if (s.propagate.levels[var] == 0)
 					continue;
 
-				if (!s.propagate.reasons[var])
+				if (!s.reasons[var])
 					return false;
 
 				if (!(abstract_levels & level_to_abstract_level(s.propagate.levels[var])))
@@ -93,7 +94,7 @@ public:
 
 		std::vector<literal> result;
 		for (literal lit: learnt_clause) {
-			if (s.propagate.reasons[lit.variable()]) {
+			if (s.reasons[lit.variable()]) {
 				/* XXX: This copy may be expensive. */
 				std::vector<bool> seen_copy = seen;
 				if (redundant(s, seen_copy, lit, abstract_levels))
