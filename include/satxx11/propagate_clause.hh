@@ -55,38 +55,31 @@ public:
 	/* Use as follows: watches[thread_id][clause_id] */
 	std::vector<watch_indices> *watches;
 
-	unsigned int *trail;
-	unsigned int trail_index;
-	unsigned int trail_size;
-
-	unsigned int *decisions;
-	unsigned int decision_index;
-
-	/* Decision level at which the variable was set. */
-	unsigned int *levels;
+	propagate_clause()
+	{
+	}
 
 	template<class Solver>
-	propagate_clause(Solver &s):
-		watchlists(new watchlist[2 * s.nr_variables]),
-		watches(new std::vector<watch_indices>[s.nr_threads]),
-		trail(new unsigned int[s.nr_variables]),
-		trail_index(0),
-		trail_size(0),
-		decisions(new unsigned int[s.nr_variables]),
-		decision_index(0),
-		levels(new unsigned int[s.nr_variables])
+	void start(Solver &s)
 	{
+		watchlists = new watchlist[2 * s.nr_variables];
+		watches = new std::vector<watch_indices>[s.nr_threads];
 	}
 
 	~propagate_clause()
 	{
 		delete[] watchlists;
 		delete[] watches;
-		delete[] trail;
-		delete[] decisions;
 	}
 
-	void attach_with_watches(clause c, unsigned int i, unsigned int j)
+	template<class Solver, typename ClauseType>
+	bool attach(Solver &s, ClauseType c)
+	{
+		return true;
+	}
+
+	template<class Solver>
+	void attach(Solver &s, clause c, unsigned int i, unsigned int j)
 	{
 		debug_enter("clause = $, i = $, j = $", c, i, j);
 
@@ -101,6 +94,14 @@ public:
 		if (watches[c.thread()].size() <= c.index())
 			watches[c.thread()].resize(c.index() + 1);
 		watches[c.thread()][c.index()] = w;
+	}
+
+	template<class Solver>
+	bool attach(Solver &s, std::tuple<clause, unsigned int, unsigned int> c)
+	{
+		/* Unpack arguments and call the right function. */
+		attach(s, std::get<0>(c), std::get<1>(c), std::get<2>(c));
+		return true;
 	}
 
 	template<class Solver>
@@ -124,7 +125,7 @@ public:
 				if (s.defined(c[j]) && !s.value(c[j]))
 					continue;
 
-				attach_with_watches(c, i, j);
+				attach(c, i, j);
 				return;
 			}
 
@@ -167,7 +168,7 @@ public:
 						found_true = i;
 					} else {
 						/* Found two true literals */
-						attach_with_watches(c, found_true, i);
+						attach(s, c, found_true, i);
 						return true;
 					}
 				} else {
@@ -182,11 +183,11 @@ public:
 					found_undefined = i;
 				} else if (found & 1) {
 					/* We have one true and one undefined literal */
-					attach_with_watches(c, found_true, found_undefined);
+					attach(s, c, found_true, found_undefined);
 					return true;
 				} else {
 					/* Found two undefined literals */
-					attach_with_watches(c, found_undefined, i);
+					attach(s, c, found_undefined, i);
 					return true;
 				}
 			}
@@ -195,10 +196,10 @@ public:
 		if (found & 1) {
 			/* We found only one true literal. */
 			if (found & 4) {
-				attach_with_watches(c, found_true, found_undefined);
+				attach(s, c, found_true, found_undefined);
 				return true;
 			} else if (found & 2) {
-				attach_with_watches(c, found_true, found_false);
+				attach(s, c, found_true, found_false);
 				return true;
 			}
 		} else if (found & 4) {
@@ -214,47 +215,19 @@ public:
 		return false;
 	}
 
-	void detach(clause c)
+	template<class Solver, typename ClauseType>
+	void detach(Solver &s, ClauseType c)
+	{
+	}
+
+	template<class Solver>
+	void detach(Solver &s, clause c)
 	{
 		debug_enter("clause = $", c);
 
 		watch_indices w = watches[c.thread()][c.index()];
 		watchlists[~c[w[0]]].remove(c);
 		watchlists[~c[w[1]]].remove(c);
-	}
-
-	template<class Solver>
-	void decision(Solver &s, literal lit)
-	{
-		debug_enter("literal = $", lit);
-
-		assert_hotpath(!s.defined(lit));
-		assert_hotpath(trail_index == trail_size);
-
-		unsigned int variable = lit.variable();
-		s.assign(lit, true);
-		trail[trail_size] = variable;
-		decisions[decision_index] = trail_size;
-		++trail_size;
-		++decision_index;
-		levels[variable] = decision_index;
-	}
-
-	/* Called whenever a variable is forced to a particular value. The
-	 * variable may be defined already, in which case we have a conflict
-	 * and this function will return false. */
-	template<class Solver>
-	void implication(Solver &s, literal lit)
-	{
-		debug_enter("literal = $", lit);
-
-		assert_hotpath(!s.defined(lit));
-
-		unsigned int variable = lit.variable();
-		s.assign(lit, true);
-		trail[trail_size] = variable;
-		++trail_size;
-		levels[variable] = decision_index;
 	}
 
 	/* Return false if and only if there was a conflict. */
@@ -355,48 +328,6 @@ public:
 		}
 
 		return debug_return(true, "$");
-	}
-
-	/* Return false if and only if there was a conflict. */
-	template<class Solver>
-	bool propagate(Solver &s)
-	{
-		debug_enter("");
-
-		while (trail_index < trail_size) {
-			debug("trail_index = $, trail_size = $", trail_index, trail_size);
-			unsigned int var = trail[trail_index++];
-
-			/* If propagation caused a conflict, abort the rest
-			 * of the conflicts as well. */
-			/* XXX: Make a version of propagate() that takes the
-			 * variable and the value as separate arguments. */
-			if (!propagate(s, literal(var, s.value(var))))
-				return debug_return(false, "$");
-		}
-
-		return debug_return(true, "$");
-	}
-
-	template<class Solver>
-	void backtrack(Solver &s, unsigned int decision)
-	{
-		debug_enter("decision = $", decision);
-
-		assert(decision < decision_index);
-
-		/* Unassign the variables that we've assigned since the
-		 * given index. */
-		unsigned new_trail_size = decisions[decision];
-		debug("new trail size = $", new_trail_size);
-
-		/* XXX: It doesn't REALLY matter what order we do this in. */
-		for (unsigned int i = trail_size; i-- > new_trail_size; )
-			s.unassign(trail[i]);
-
-		trail_index = new_trail_size;
-		trail_size = new_trail_size;
-		decision_index = decision;
 	}
 };
 

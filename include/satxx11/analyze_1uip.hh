@@ -46,8 +46,8 @@ public:
 
 		std::vector<bool> seen(s.nr_variables, false);
 
-		assert(s.propagate.decision_index > 0);
-		unsigned int trail_index = s.propagate.trail_size;
+		assert(s.stack.decision_index > 0);
+		unsigned int trail_index = s.stack.trail_size;
 
 		unsigned int counter = 0;
 		std::vector<literal> conflict_clause;
@@ -72,8 +72,8 @@ public:
 				seen[variable] = true;
 				s.resolve(lit);
 
-				unsigned int level = s.propagate.levels[variable];
-				if (level == s.propagate.decision_index) {
+				unsigned int level = s.stack.levels[variable];
+				if (level == s.stack.decision_index) {
 					++counter;
 				} else if (level > 0) {
 					/* Exclude variables from decision level 0 */
@@ -83,7 +83,7 @@ public:
 
 			do {
 				assert_hotpath(trail_index > 0);
-				variable = s.propagate.trail[--trail_index];
+				variable = s.stack.trail[--trail_index];
 			} while (!seen[variable]);
 
 			assert_hotpath(counter > 0);
@@ -116,7 +116,7 @@ public:
 		} else {
 			unsigned int new_decision_index = 0;
 			for (literal l: conflict_clause) {
-				unsigned int level = s.propagate.levels[l.variable()];
+				unsigned int level = s.stack.levels[l.variable()];
 
 				if (level > new_decision_index)
 					new_decision_index = level;

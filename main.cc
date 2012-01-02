@@ -133,13 +133,30 @@ static void solve(t *s, const std::vector<literal> &literals, const std::vector<
 
 class reason {
 public:
-	clause clause_data;
+	enum {
+		DECISION,
+		BINARY_CLAUSE,
+		CLAUSE,
+	} type;
 
-	reason()
+	union {
+		binary_clause binary_clause_data;
+		clause clause_data;
+	};
+
+	reason():
+		type(DECISION)
+	{
+	}
+
+	reason(binary_clause c):
+		type(BINARY_CLAUSE),
+		binary_clause_data(c)
 	{
 	}
 
 	reason(clause c):
+		type(CLAUSE),
 		clause_data(c)
 	{
 	}
@@ -149,12 +166,23 @@ public:
 		assert_hotpath(clause_data);
 
 		v.clear();
-		clause_data.get_literals(v);
+		switch (type) {
+		case DECISION:
+			break;
+		case BINARY_CLAUSE:
+			binary_clause_data.get_literals(v);
+			break;
+		case CLAUSE:
+			clause_data.get_literals(v);
+			break;
+		default:
+			assert(false);
+		}
 	}
 
 	operator bool() const
 	{
-		return clause_data;
+		return type != DECISION;
 	}
 };
 

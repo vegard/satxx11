@@ -47,14 +47,14 @@ public:
 			if (s.defined(var))
 				continue;
 
-			s.propagate.decision(s, literal(var, value));
-			while (!s.propagate.propagate(s)) {
+			s.stack.decision(s, literal(var, value));
+			while (!s.stack.propagate(s)) {
 				s.analyze(s);
 				++nr_literals;
 			}
 
-			if (s.propagate.decision_index > 0)
-				s.propagate.backtrack(s, 0);
+			if (s.stack.decision_index > 0)
+				s.stack.backtrack(s, 0);
 		}
 
 		return nr_literals;
@@ -63,7 +63,7 @@ public:
 	template<class Solver>
 	void operator()(Solver &s)
 	{
-		assert(s.propagate.decision_index == 0);
+		assert(s.stack.decision_index == 0);
 
 		unsigned int nr_literals = 0;
 

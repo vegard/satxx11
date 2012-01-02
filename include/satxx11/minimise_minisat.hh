@@ -65,13 +65,13 @@ public:
 
 				seen[var] = 1;
 
-				if (s.propagate.levels[var] == 0)
+				if (s.stack.levels[var] == 0)
 					continue;
 
 				if (!s.reasons[var])
 					return false;
 
-				if (!(abstract_levels & level_to_abstract_level(s.propagate.levels[var])))
+				if (!(abstract_levels & level_to_abstract_level(s.stack.levels[var])))
 					return false;
 
 				agenda.push(var);
@@ -90,7 +90,7 @@ public:
 
 		uint64_t abstract_levels = 0;
 		for (literal lit: learnt_clause)
-			abstract_levels |= level_to_abstract_level(s.propagate.levels[lit.variable()]);
+			abstract_levels |= level_to_abstract_level(s.stack.levels[lit.variable()]);
 
 		std::vector<literal> result;
 		for (literal lit: learnt_clause) {

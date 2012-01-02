@@ -35,7 +35,9 @@
 #include <satxx11/plugin_graphviz.hh>
 #include <satxx11/plugin_list.hh>
 #include <satxx11/plugin_stdio.hh>
+#include <satxx11/propagate_binary_clause.hh>
 #include <satxx11/propagate_clause.hh>
+#include <satxx11/propagate_list.hh>
 #include <satxx11/receive_all.hh>
 #include <satxx11/reduce_noop.hh>
 #include <satxx11/reduce_size.hh>
@@ -46,6 +48,8 @@
 #include <satxx11/send_size.hh>
 #include <satxx11/simplify_list.hh>
 #include <satxx11/simplify_failed_literal_probing.hh>
+#include <satxx11/stack_default.hh>
+#include <satxx11/valuation_compact.hh>
 
 /* Workaround for missing implementation in libstdc++ for gcc 4.6. */
 namespace std {
@@ -80,8 +84,10 @@ typedef std::vector<literal_vector> literal_vector_vector;
 
 template<class ReasonType,
 	class Random = std::ranlux24_base,
+	class Valuation = valuation_compact,
+	class Stack = stack_default,
 	class Decide = decide_cached_polarity<decide_vsids<95>>,
-	class Propagate = propagate_clause<>,
+	class Propagate = propagate_list<propagate_binary_clause, propagate_clause<>>,
 	class Analyze = analyze_1uip<minimise_minisat>,
 	class Send = send_size<4>,
 	class Receive = receive_all,
@@ -102,8 +108,6 @@ public:
 	const variable_map &variables;
 	const variable_map &reverse_variables;
 	const literal_vector_vector &original_clauses;
-
-	std::vector<bool> valuation;
 
 	/* Indexed by variable. Gives the reason why a variable was set
 	 * if the variable was implied. */
@@ -140,6 +144,8 @@ public:
 	std::vector<clause> pending_clauses;
 
 	Random random;
+	Valuation valuation;
+	Stack stack;
 	Decide decide;
 	Propagate propagate;
 	Analyze analyze;
@@ -170,7 +176,6 @@ public:
 		reverse_variables(reverse_variables),
 		original_clauses(original_clauses),
 
-		valuation(2 * nr_variables),
 		reasons(new reason_type[nr_variables]),
 
 		/* XXX: Not RAII. */
@@ -178,8 +183,9 @@ public:
 		channel(0),
 
 		random(seed),
+		valuation(*this),
+		stack(*this),
 		decide(*this),
-		propagate(*this),
 		analyze(*this),
 		send(*this),
 		receive(*this),
@@ -192,6 +198,8 @@ public:
 		/* XXX: Necessary? */
 		for (unsigned int i = 0; i < nr_variables; ++i)
 			reasons[i] = reason_type();
+
+		propagate.start(*this);
 	}
 
 	~solver()
@@ -202,56 +210,45 @@ public:
 		delete[] output;
 	}
 
-	bool defined(unsigned int variable) const
+	bool defined(unsigned int var) const
 	{
-		assert_hotpath(variable < nr_variables);
-		return valuation[2 * variable + 0];
+		return valuation.defined(*this, var);
 	}
 
-	bool defined(literal l) const
+	bool defined(literal lit) const
 	{
-		return defined(l.variable());
+		return valuation.defined(*this, lit);
 	}
 
-	bool value(unsigned int variable) const
+	bool value(unsigned int var) const
 	{
-		assert_hotpath(variable < nr_variables);
-		assert_hotpath(defined(variable));
-		return valuation[2 * variable + 1];
+		return valuation.value(*this, var);
 	}
 
-	bool value(literal l) const
+	bool value(literal lit) const
 	{
-		return value(l.variable()) == l.value();
+		return valuation.value(*this, lit);
 	}
 
 	void assign(unsigned int variable, bool value)
 	{
 		debug_enter("variable = $, value = $", variable, value);
 
-		assert_hotpath(variable < nr_variables);
-		assert_hotpath(!defined(variable));
-		valuation[2 * variable + 0] = true;
-		valuation[2 * variable + 1] = value;
-
-		//propagate.assign(variable, value);
+		valuation.assign(*this, variable, value);
 		decide.assign(*this, variable, value);
 		plugin.assign(*this, variable, value);
 	}
 
 	void assign(literal l, bool value)
 	{
-		assign(l.variable(), l.value() == value);
+		valuation.assign(*this, l.variable(), l.value() == value);
 	}
 
 	void unassign(unsigned int variable)
 	{
 		debug_enter("variable = $", variable);
 
-		assert_hotpath(variable < nr_variables);
-		assert_hotpath(defined(variable));
-		valuation[2 * variable + 0] = false;
-
+		valuation.unassign(*this, variable);
 		decide.unassign(*this, variable);
 		plugin.unassign(*this, variable);
 	}
@@ -265,7 +262,7 @@ public:
 	{
 		if (!propagate.attach(*this, c))
 			return false;
-		if (!propagate.propagate(*this))
+		if (!stack.propagate(*this))
 			return false;
 
 		decide.attach(c);
@@ -276,9 +273,10 @@ public:
 		return true;
 	}
 
+	/* XXX: Fix me. */
 	void attach_with_watches(clause c, unsigned int i, unsigned int j)
 	{
-		propagate.attach_with_watches(c, i, j);
+		propagate.attach(c, std::make_tuple(c, i, j));
 		decide.attach(c);
 		send.attach(*this, c);
 		receive.attach(*this, c);
@@ -288,7 +286,7 @@ public:
 
 	void detach(clause c)
 	{
-		propagate.detach(c);
+		propagate.detach(*this, c);
 		decide.detach(c);
 		send.detach(*this, c);
 		receive.detach(*this, c);
@@ -344,7 +342,7 @@ public:
 	void decision(literal lit)
 	{
 		reasons[lit.variable()] = reason_type();
-		propagate.decision(*this, lit);
+		stack.decision(*this, lit);
 		plugin.decision(*this, lit);
 	}
 
@@ -363,7 +361,7 @@ public:
 
 		reasons[lit.variable()] = reason;
 		plugin.implication(*this, lit, reason);
-		propagate.implication(*this, lit);
+		stack.implication(*this, lit);
 		return true;
 	}
 
@@ -388,7 +386,7 @@ public:
 
 	void backtrack(unsigned int decision)
 	{
-		propagate.backtrack(*this, decision);
+		stack.backtrack(*this, decision);
 		plugin.backtrack(*this, decision);
 	}
 
@@ -415,12 +413,12 @@ public:
 			}
 
 			++nr_decisions;
-			propagate.decision(*this, ~c[i]);
-			if (!propagate.propagate(*this)) {
+			stack.decision(*this, ~c[i]);
+			if (!stack.propagate(*this)) {
 				/* The clause is subsumed by knowledge that
 				 * we already have (i.e. it is implied by the
 				 * clause database); don't attach it. */
-				propagate.backtrack(*this, 0);
+				stack.backtrack(*this, 0);
 				return true;
 			}
 		}
@@ -432,21 +430,21 @@ public:
 				/* The last literal is implied by the clause
 				 * database; don't attach it. */
 				if (nr_decisions)
-					propagate.backtrack(*this, 0);
+					stack.backtrack(*this, 0);
 				return true;
 			} else {
 				/* The negated literal was implied. This
 				 * means that we can shorten the clause. */
 				/* XXX: Actually shorten it. */
 				if (nr_decisions)
-					propagate.backtrack(*this, 0);
+					stack.backtrack(*this, 0);
 				return false;
 			}
 		}
 
 		/* As far as we could tell, the clause is not redundant. */
 		if (nr_decisions)
-			propagate.backtrack(*this, 0);
+			stack.backtrack(*this, 0);
 		return false;
 	}
 
@@ -454,7 +452,7 @@ public:
 	 * because we received some literals/clauses from other threads. */
 	bool restart()
 	{
-		propagate.backtrack(*this, 0);
+		stack.backtrack(*this, 0);
 		/* XXX: For the time being, this is a small hack to prevent
 		 * the stdout plugin from seeing backtrack(0) in every restart,
 		 * and always printing 0 as the minimum backtrack level. */
@@ -473,7 +471,7 @@ public:
 
 		pending_literals.clear();
 
-		if (!propagate.propagate(*this))
+		if (!stack.propagate(*this))
 			return false;
 
 		for (clause c: pending_clauses) {
@@ -490,7 +488,7 @@ public:
 
 		pending_clauses.clear();
 
-		if (!propagate.propagate(*this))
+		if (!stack.propagate(*this))
 			return false;
 
 		return true;
@@ -581,7 +579,7 @@ public:
 		if (should_exit)
 			return;
 
-		if (!propagate.propagate(*this))
+		if (!stack.propagate(*this))
 			unsat();
 
 		/* Simplify the instance before doing anything else. */
@@ -664,8 +662,8 @@ public:
 			/* If we have assigned values to all the variables
 			 * without reaching a conflict, this means that the
 			 * current assignment satisfies the instance. */
-			if (propagate.trail_index == nr_variables) {
-				if (propagate.decision_index == 0 || !keep_going) {
+			if (stack.complete(*this)) {
+				if (stack.decision_index == 0 || !keep_going) {
 					should_exit = true;
 					sat();
 					break;
@@ -678,8 +676,8 @@ public:
 				 * from finding the same solution again. */
 				std::vector<literal> conflict_clause;
 
-				for (unsigned int i = 0; i < propagate.decision_index; ++i) {
-					unsigned int variable = propagate.trail[propagate.decisions[i]];
+				for (unsigned int i = 0; i < stack.decision_index; ++i) {
+					unsigned int variable = stack.trail[stack.decisions[i]];
 
 					conflict_clause.push_back(literal(variable, !value(variable)));
 				}
@@ -693,7 +691,7 @@ public:
 					bool ret = implication(conflict_clause[0]);
 					assert(ret);
 
-					if (!propagate.propagate(*this)) {
+					if (!stack.propagate(*this)) {
 						should_exit = true;
 						break;
 					}
@@ -713,10 +711,10 @@ public:
 			}
 
 			decision(decide(*this));
-			while (!propagate.propagate(*this) && !should_exit) {
+			while (!stack.propagate(*this) && !should_exit) {
 				conflict();
 
-				if (propagate.decision_index == 0) {
+				if (stack.decision_index == 0) {
 					/* A conflict at decision level 0 means the instance
 					 * is unsat. */
 					unsat();
@@ -742,12 +740,6 @@ public:
 
 				analyze(*this);
 			}
-
-#if 0
-			/* Let writers know that we're done with old copies
-			 * of RCU-protected data. */
-			rcu_quiescent_state();
-#endif
 		}
 
 		printf("c Thread %u stopping\n", id);
