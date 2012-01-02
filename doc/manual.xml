@@ -154,7 +154,150 @@ typedef solver&lt;ranlux24_base,
 
 		<chapter>
 			<title>Tutorial: Writing a plugin</title>
-			<para>TODO</para>
+
+			<section>
+				<title>Introduction</title>
+				<para>In this chapter, you will learn how to write a plugin from scratch and use it with the standard solver. The plugin itself will be a decision variable heuristic based on two existing heuristics, but many of the techniques used for decision variable heuristic plugins will apply to other kinds of plugins as well.</para>
+				<para>The particular heuristic that we will create is similar to the VSIDS heuristic, except that some predefined percentage of the decisions will be made at random. We can achieve this by <emphasis>reusing</emphasis> the two built-in decision heuristics <literal>decide_vsids</literal> and <literal>decide_random</literal> (without the use of copy/paste, of course!).</para>
+			</section>
+
+			<section>
+				<title>Creating the class</title>
+				<para>First of all, we will create a new file that contains all the code for our new heuristic. Let's call it <filename>my_decide.hh</filename> and place it in the top-level directory, i.e. alongside <filename>main.cc</filename>. This file needs to include the two built-in heuristics that we are reusing, and also declare and define our own class:</para>
+				<programlisting>#ifndef MY_DECIDE_HH
+#define MY_DECIDE_HH
+
+#include &lt;satxx11/decide_random.hh&gt;
+#include &lt;satxx11/decide_vsids.hh&gt;
+
+using namespace satxx11;
+
+class my_decide {
+public:
+};
+
+#endif</programlisting>
+				<para>This class will be instantiated once per thread just like all the other plugins. In order to actually use the two built-in heuristics, we have to instantiate them too. This we do by making them members of our new class.</para>
+<programlisting>class my_decide {
+public:
+    decide_random random;
+    decide_vsids&lt;95&gt; vsids;
+};</programlisting>
+				<para>However, decision variable heuristics (as most plugins) will need to know certain information about the solver and the instance as part of their initialisation. For example, the VSIDS heuristic allocates an array of doubles to hold the current activity value for each variable, so it needs to know how many variables there are in the instance. In order for the solver to provide all this information to plugins, it passes a reference to itself as the first argument to most of the plugin's functions and, in this case most importantly, to the constructor. Our constructor, therefore, simply needs to pass this argument on to the two plugins we are using:</para>
+				<programlisting>template&lt;class Solver&gt;
+my_decide(Solver &amp;s):
+    random(s),
+    vsids(s)
+{
+}</programlisting>
+				<para>At first it may seem a little odd to make the solver type a template parameter, but you will soon get used to it. The reason we have to do this is that the solver class is itself a template class whose type depends on all the plugins it is using! In other words, the solver type depends on what plugins it is using, and we would like our plugin to be independent of the (other) plugins that the solver is using.</para>
+			</section>
+			<section>
+				<title>Implementing the event handlers</title>
+				<para>The event handlers are functions of the plugin we are writing, and the exact set of events that we need to handle depends on the type of plugin we are writing. For decision variable heuristics, we have to implement handlers for:</para>
+				<itemizedlist>
+					<listitem><para>Variable assignment and unassignment events; in order to possibly keep track of what variables are eligible for being picked as decision variables.</para></listitem>
+					<listitem><para>Clause resolution events; in order to possibly bump variable activities (for VSIDS-like heuristics).</para></listitem>
+					<listitem><para>Clause attachment and detachment events; in order to possibly keep track of what variables/literals occur the most frequently.</para></listitem>
+					<listitem><para>Conflict events; in order to possibly decay the variable activities (for VSIDS-like heuristics).</para></listitem>
+				</itemizedlist>
+				<para>It doesn't matter that we don't need to know about certain events; empty functions will be completely optimised away by the compiler, since the compiler knows (at compile-time) exactly what functions will be called. This is one of the huge advantages of using a compile-time plugin architecture; there is absolutely no runtime overhead for calling empty event handlers.</para>
+				<para>Our event handlers are going to forward the events to the two plugins we are using, just like we did for the constructor:</para>
+				<programlisting>template&lt;class Solver&gt;
+void assign(Solver &amp;s, unsigned int variable, bool value)
+{
+    random.assign(s, variable, value);
+    vsids.assign(s, variable, value);
+}
+
+template&lt;class Solver&gt;
+void unassign(Solver &amp;s, unsigned int variable)
+{
+    random.unassign(s, variable);
+    vsids.unassign(s, variable);
+}
+
+template&lt;class Solver&gt;
+void resolve(Solver &amp;s, literal lit)
+{
+    random.resolve(s, lit);
+    vsids.resolve(s, lit);
+}
+
+template&lt;class Solver&gt;
+void resolve(Solver &amp;s, const std::vector&lt;literal&gt; &amp;v)
+{
+    random.resolve(s, v);
+    vsids.resolve(s, v);
+}
+
+void attach(clause c)
+{
+    random.attach(c);
+    vsids.attach(c);
+}
+
+void detach(clause c)
+{
+    random.detach(c);
+    vsids.detach(c);
+}
+
+template&lt;class Solver&gt;
+void conflict(Solver &amp;s)
+{
+    random.conflict(s);
+    vsids.conflict(s);
+}</programlisting>
+			</section>
+
+			<section>
+				<title>Implementing the decision heuristic proper</title>
+				<para>With the code from the previous sections already in place, the last missing piece is the function that gets called by the solver when it is about to make a new decision. For this purpose, we overload <literal>operator()</literal> for our class and define it in terms of our two members <literal>random</literal> and <literal>vsids</literal> (which also overload <literal>operator()</literal>). It is really quite straightforward:</para>
+				<programlisting>template&lt;class Solver&gt;
+unsigned int operator()(Solver &amp;s)
+{
+    /* Make a random decision 10% of the time */
+    if (s.random() % 100 &lt; 10)
+        return random();
+
+    return vsids();
+}</programlisting>
+				<para>If you paid attention, you might have noticed the call to <literal>s.random()</literal>. Here we are in fact making a reference to another designated plugin &mdash; the solver thread's random number generator. The solver parameter that gets passed to our <literal>operator()</literal> is guaranteed to have a member <literal>random</literal> that also supports <literal>operator()</literal>.</para>
+				<para>With this, our plugin is complete.</para>
+			</section>
+
+			<section>
+				<title>Using the plugin</title>
+
+				<para>In order to actually use the new decision heuristic plugin, we need to pass it to the solver somehow. The easiest way to do this is to modify the file <filename>main.cc</filename> in the top-level directory. The file <filename>main.cc</filename> is a <emphasis>program</emphasis> that makes use of the <application>satxx11</application> <emphasis>library</emphasis>. You are supposed to modify the former, but not the latter. (If you do want to change some part of the library, you can of course just go ahead and do it. The intention, however, is that whenever you want to implement a new heuristic, you should <emphasis>extend</emphasis> the library rather than modify it.)</para>
+				<para>With those few words of warning, let's include the new plugin:</para>
+				<programlisting>#include "my_decision.hh"</programlisting>
+				<para>Now we need to modify the definition of <literal>my_solver</literal> at the top of <literal>main()</literal>:</para>
+				<programlisting>typedef solver&lt;reason&gt; my_solver;</programlisting>
+				<para>We need to change this definition to use our new plugin instead of the default decision heuristic plugin. Now, since C++ sadly doesn't support named template parameters, we actually need to substitute this rather small definition with a somewhat verbose one. Let's first look at the default parameters that are defined in <filename>include/satxx11/solver.hh</filename>, it should look something like this:</para>
+				<programlisting>template&lt;class ReasonType,
+    class Random = std::ranlux24_base,
+    class Valuation = valuation_compact,
+    class Stack = stack_default,
+    class Decide = decide_cached_polarity&lt;decide_vsids&lt;95&gt;&gt;,
+    class Propagate = propagate_list&lt;propagate_binary_clause, propagate_clause&lt;&gt;&gt;,
+    class Analyze = analyze_1uip&lt;minimise_minisat&gt;,
+    class Send = send_size&lt;4&gt;,
+    class Receive = receive_all,
+    class NextRestart = restart_multiply&lt;restart_luby, restart_fixed&lt;400&gt;&gt;,
+    class Reduce = reduce_size&lt;2&gt;,
+    class Simplify = simplify_list&lt;simplify_failed_literal_probing&gt;,
+    class Plugin = plugin_list&lt;plugin_stdio&gt;&gt;
+class solver {</programlisting>
+				<para>We therefore supply the new definition of <literal>my_solver</literal> to mimic these settings, at least until the parameter of the decision heuristic plugin, with the exception of using our new plugin instead of <literal>decide_vsids</literal>:</para>
+				<programlisting>typedef solver&lt;reason,
+    std::ranlux24_base,
+    valuation_compact,
+    stack_default,
+    decide_cached_polarity&lt;my_decide&gt;&gt; my_solver;</programlisting>
+			<para>And that's it. You should now be able to compile the solver as usual and enjoy 10% random decisions!</para>
+			</section>
 		</chapter>
 	</part>
 
