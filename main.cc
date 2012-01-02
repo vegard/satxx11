@@ -37,6 +37,7 @@ extern "C" {
 
 #include <satxx11/assert.hh>
 #include <satxx11/clause.hh>
+#include <satxx11/binary_clause.hh>
 #include <satxx11/debug.hh>
 #include <satxx11/literal.hh>
 #include <satxx11/solver.hh>
@@ -126,9 +127,12 @@ static void handle_sigint(int signum, ::siginfo_t *info, void *unused)
 }
 
 template<typename t>
-static void solve(t *s, const std::vector<literal> &literals, const std::vector<clause> &clauses)
+static void solve(t *s,
+	const std::vector<literal> &literals,
+	const std::vector<binary_clause> &binary_clauses,
+	const std::vector<clause> &clauses)
 {
-	s->run(literals, clauses);
+	s->run(literals, binary_clauses, clauses);
 }
 
 class reason {
@@ -344,11 +348,14 @@ int main(int argc, char *argv[])
 		solvers[i] = new my_solver(nr_threads, solvers, i, keep_going, should_exit, seed + i, variables, reverse_variables, clauses);
 
 	std::vector<literal> literals;
+	std::vector<binary_clause> shared_binary_clauses;
 	std::vector<clause> shared_clauses;
 	for (literal_vector v: clauses) {
 		if (v.size() == 1)
 			literals.push_back(v[0]);
-		else if (v.size() >= 2)
+		else if (v.size() == 2)
+			shared_binary_clauses.push_back(binary_clause(v[0], v[1]));
+		else if (v.size() >= 3)
 			shared_clauses.push_back(solvers[0]->allocate.allocate(nr_threads, 0, false, v));
 		else
 			assert(false);
@@ -356,8 +363,10 @@ int main(int argc, char *argv[])
 
 	/* Start threads */
 	std::thread *threads[nr_threads];
-	for (unsigned int i = 0; i < nr_threads; ++i)
-		threads[i] = new std::thread(solve<my_solver>, solvers[i], literals, shared_clauses);
+	for (unsigned int i = 0; i < nr_threads; ++i) {
+		threads[i] = new std::thread(solve<my_solver>, solvers[i],
+			literals, shared_binary_clauses, shared_clauses);
+	}
 
 	/* Wait for the solvers to finish/exit */
 	for (unsigned int i = 0; i < nr_threads; ++i)

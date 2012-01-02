@@ -217,11 +217,13 @@ public:
 			bump(lit);
 	}
 
-	void attach(clause c)
+	template<class ClauseType>
+	void attach(ClauseType c)
 	{
 	}
 
-	void detach(clause c)
+	template<class ClauseType>
+	void detach(ClauseType c)
 	{
 	}
 

@@ -70,12 +70,14 @@ public:
 		x.resolve(s, c);
 	}
 
-	void attach(clause c)
+	template<class ClauseType>
+	void attach(ClauseType c)
 	{
 		x.attach(c);
 	}
 
-	void detach(clause c)
+	template<class ClauseType>
+	void detach(ClauseType c)
 	{
 		x.detach(c);
 	}

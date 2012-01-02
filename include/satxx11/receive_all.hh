@@ -30,13 +30,13 @@ public:
 	{
 	}
 
-	template<class Solver>
-	void attach(Solver &s, clause c)
+	template<class Solver, class ClauseType>
+	void attach(Solver &s, ClauseType c)
 	{
 	}
 
-	template<class Solver>
-	void detach(Solver &s, clause c)
+	template<class Solver, class ClauseType>
+	void detach(Solver &s, ClauseType c)
 	{
 	}
 

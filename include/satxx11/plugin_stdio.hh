@@ -123,6 +123,20 @@ public:
 		++nr_clause_1;
 	}
 
+	template<class Solver, class ClauseType>
+	void attach(Solver &s, ClauseType c)
+	{
+		/* Dummy handler for unknown clause types. */
+	}
+
+	template<class Solver>
+	void attach(Solver &s, binary_clause c)
+	{
+		attach(2);
+
+		++nr_clause_2;
+	}
+
 	template<class Solver>
 	void attach(Solver &s, clause c)
 	{
@@ -138,6 +152,11 @@ public:
 			++nr_clause_3;
 		else if (n >= 4)
 			++nr_clause_greater;
+	}
+
+	template<class Solver, class ClauseType>
+	void detach(Solver &s, ClauseType c)
+	{
 	}
 
 	template<class Solver>

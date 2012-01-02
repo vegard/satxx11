@@ -106,20 +106,20 @@ public:
 		attach(s, plugins, lit);
 	}
 
-	template<class Solver, unsigned int I = 0, typename... Args>
-	typename std::enable_if<I == sizeof...(Args), void>::type attach(Solver &s, std::tuple<Args...> &args, clause c)
+	template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), void>::type attach(Solver &s, std::tuple<Args...> &args, ClauseType c)
 	{
 	}
 
-	template<class Solver, unsigned int I = 0, typename... Args>
-	typename std::enable_if<I < sizeof...(Args), void>::type attach(Solver &s, std::tuple<Args...> &args, clause c)
+	template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), void>::type attach(Solver &s, std::tuple<Args...> &args, ClauseType c)
 	{
 		std::get<I>(args).attach(s, c);
-		attach<Solver, I + 1>(s, args, c);
+		attach<Solver, ClauseType, I + 1>(s, args, c);
 	}
 
-	template<class Solver>
-	void attach(Solver &s, clause c)
+	template<class Solver, class ClauseType>
+	void attach(Solver &s, ClauseType c)
 	{
 		attach(s, plugins, c);
 	}

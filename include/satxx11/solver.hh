@@ -258,7 +258,8 @@ public:
 		plugin.attach(*this, l);
 	}
 
-	bool attach(clause c) __attribute__ ((warn_unused_result))
+	template<typename ClauseType>
+	bool attach(ClauseType c) /* XXX: __attribute__ ((warn_unused_result)) */
 	{
 		if (!propagate.attach(*this, c))
 			return false;
@@ -546,7 +547,11 @@ public:
 		printf("s UNSATISFIABLE\n");
 	}
 
-	void run(const std::vector<literal> &literals, const std::vector<clause> &clauses)
+	/* XXX: Find a way to attach literals/clauses without having to modify
+	 * this signature all the time. */
+	void run(const std::vector<literal> &literals,
+		const std::vector<binary_clause> &binary_clauses,
+		const std::vector<clause> &clauses)
 	{
 		debug_thread_id = id;
 
@@ -559,6 +564,17 @@ public:
 
 		/* Attach all clauses in the original instance */
 		for (clause c: clauses) {
+			if (!attach(c)) {
+				unsat();
+				break;
+			}
+		}
+
+		if (should_exit)
+			return;
+
+		/* Attach all binary clauses in the original instance */
+		for (binary_clause c: binary_clauses) {
 			if (!attach(c)) {
 				unsat();
 				break;
