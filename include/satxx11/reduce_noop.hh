@@ -41,6 +41,11 @@ public:
 	}
 
 	template<class Solver>
+	void resolve(Solver &s, const std::vector<literal> &v)
+	{
+	}
+
+	template<class Solver>
 	void operator()(Solver &s)
 	{
 	}
