@@ -16,24 +16,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SATXX11_PROPAGATE_BINARY_CLAUSE_HH
-#define SATXX11_PROPAGATE_BINARY_CLAUSE_HH
-
-#include <vector>
-
-#include <satxx11/binary_clause.hh>
-#include <satxx11/erase.hh>
-#include <satxx11/literal.hh>
+#ifndef SATXX11_PROPAGATE_UNARY_CLAUSE_HH
+#define SATXX11_PROPAGATE_UNARY_CLAUSE_HH
 
 namespace satxx11 {
 
-class propagate_binary_clause {
+class propagate_unary_clause {
 public:
-	class binary_clause_share {
+	class unary_clause_share {
 	public:
-		std::vector<binary_clause> clauses;
+		std::vector<literal> literals;
 
-		binary_clause_share()
+		unary_clause_share()
 		{
 		}
 
@@ -43,9 +37,9 @@ public:
 		}
 
 		template<class Solver>
-		void share(Solver &s, binary_clause c)
+		void share(Solver &s, literal lit)
 		{
-			clauses.push_back(c);
+			literals.push_back(lit);
 		}
 
 		template<class Solver, class ClauseType>
@@ -54,44 +48,39 @@ public:
 		}
 
 		template<class Solver>
-		void detach(Solver &s, binary_clause c)
+		void detach(Solver &s, literal lit)
 		{
 		}
 
 		template<class Solver>
 		bool restart(Solver &s)
 		{
-			for (binary_clause c: clauses) {
-				if (!s.attach(c))
-					return false;
-
-				if (!s.stack.propagate(s))
+			for (literal lit: literals) {
+				if (!s.attach(lit))
 					return false;
 			}
 
-			return true;
+			/* XXX: Do we need to call propagate() after _each_
+			 * attached literal, or is this enough? */
+			return s.stack.propagate(s);
 		}
 	};
 
-	typedef binary_clause_share share;
+	typedef unary_clause_share share;
 
-	/* XXX: Use std::unique_ptr<> */
-	/* XXX: Share watchlists with other threads */
-	std::vector<literal> *watchlists;
-
-	propagate_binary_clause()
+	propagate_unary_clause()
 	{
 	}
 
 	template<class Solver>
 	void start(Solver &s)
 	{
-		watchlists = new std::vector<literal>[2 * s.nr_variables];
 	}
 
-	~propagate_binary_clause()
+	template<class Solver>
+	bool attach(Solver &s, literal lit)
 	{
-		delete[] watchlists;
+		return s.implication(lit);
 	}
 
 	template<class Solver, typename ClauseType>
@@ -100,28 +89,20 @@ public:
 		return true;
 	}
 
-	template<class Solver>
-	bool attach(Solver &s, binary_clause c)
-	{
-		watchlists[~c.a].push_back(c.b);
-		watchlists[~c.b].push_back(c.a);
-		return true;
-	}
-
 	/* NOTE: Only use this for clauses attached before starting the
 	 * solver threads! */
 	template<class Solver>
 	bool attach(Solver &s, const std::vector<literal> &v, bool &ok)
 	{
-		if (v.size() != 2)
+		if (v.size() != 1)
 			return false;
 
-		binary_clause c(v[0], v[1]);
+		literal lit = v[0];
 
-		/* Attach clause in all threads */
+		/* Attach literal in all threads */
 		bool all_ok = true;
 		for (unsigned int i = 0; i < s.nr_threads; ++i)
-			all_ok = all_ok && s.solvers[i]->attach(c);
+			all_ok = all_ok && s.solvers[i]->attach(lit);
 
 		ok = all_ok;
 		return true;
@@ -130,15 +111,13 @@ public:
 	template<class Solver>
 	bool attach_learnt(Solver &s, const std::vector<literal> &v, bool &ok)
 	{
-		if (v.size() != 2)
+		if (v.size() != 1)
 			return false;
 
-		binary_clause c(v[0], v[1]);
+		literal lit = v[0];
 
-		/* Attach clause in our own thread, but share it with the other
-		 * threads */
-		ok = s.attach(c);
-		s.share(c);
+		ok = s.attach(lit);
+		s.share(lit);
 		return true;
 	}
 
@@ -147,27 +126,10 @@ public:
 	{
 	}
 
-	template<class Solver>
-	void detach(Solver &s, binary_clause c)
-	{
-		erase(watchlists[~c.a], c.b);
-		erase(watchlists[~c.b], c.a);
-	}
-
 	/* Return false if and only if there was a conflict. */
 	template<class Solver>
 	bool propagate(Solver &s, literal lit)
 	{
-		assert_hotpath(s.defined(lit));
-		assert_hotpath(s.value(lit));
-
-		/* Go through the watchlist; for each clause in the
-		 * watchlist, we need to assign the other literal to true. */
-		for (literal other_lit: watchlists[lit]) {
-			if (!s.implication(other_lit, binary_clause(~lit, other_lit)))
-				return false;
-		}
-
 		return true;
 	}
 };

@@ -96,49 +96,26 @@ public:
 			s.reasons[variable].get_literals(reason);
 		}
 
-		literal asserting_literal = ~literal(variable, s.value(variable));
-
 		if (conflict_clause.size() > 0)
 			minimise(s, seen, conflict_clause);
 
-		if (conflict_clause.size() == 0) {
-			debug("learnt = $", asserting_literal);
+		unsigned int new_decision_index = 0;
+		for (literal l: conflict_clause) {
+			unsigned int level = s.stack.levels[l.variable()];
 
-			s.backtrack(0);
-
-			/* XXX: This can never fail, so we should not check
-			 * whether it does in the hotpath. */
-			bool ret = s.implication(asserting_literal, clause());
-			assert(ret);
-
-			s.attach(asserting_literal);
-			s.share(asserting_literal);
-		} else {
-			unsigned int new_decision_index = 0;
-			for (literal l: conflict_clause) {
-				unsigned int level = s.stack.levels[l.variable()];
-
-				if (level > new_decision_index)
-					new_decision_index = level;
-			}
-
-			conflict_clause.push_back(asserting_literal);
-
-			clause learnt_clause = s.allocate.allocate(s.nr_threads, s.id, true, conflict_clause);
-			debug("learnt = $", learnt_clause);
-
-			s.backtrack(new_decision_index);
-
-			/* Automatically force the opposite polarity for the last
-			 * variable (after backtracking its consequences). */
-			bool ret = s.implication(asserting_literal, learnt_clause);
-			assert(ret);
-
-			/* Attach the newly learnt clause. It will be satisfied by
-			 * the implication above. */
-			s.attach_with_watches(learnt_clause, learnt_clause.size() - 1, learnt_clause.size() - 2);
-			s.share(learnt_clause);
+			if (level > new_decision_index)
+				new_decision_index = level;
 		}
+
+		literal asserting_literal = ~literal(variable, s.value(variable));
+		conflict_clause.push_back(asserting_literal);
+
+		s.backtrack(new_decision_index);
+
+		/* XXX: The old code is faster because it doesn't need to
+		 * look for new watches. */
+		bool ok = s.attach_learnt(conflict_clause);
+		assert(ok);
 	}
 };
 

@@ -38,6 +38,7 @@
 #include <satxx11/propagate_binary_clause.hh>
 #include <satxx11/propagate_clause.hh>
 #include <satxx11/propagate_list.hh>
+#include <satxx11/propagate_unary_clause.hh>
 #include <satxx11/receive_all.hh>
 #include <satxx11/reduce_noop.hh>
 #include <satxx11/reduce_size.hh>
@@ -87,7 +88,10 @@ template<class ReasonType,
 	class Valuation = valuation_compact,
 	class Stack = stack_default,
 	class Decide = decide_cached_polarity<decide_vsids<95>>,
-	class Propagate = propagate_list<propagate_binary_clause, propagate_clause<>>,
+	class Propagate = propagate_list<
+		propagate_unary_clause,
+		propagate_binary_clause,
+		propagate_clause<>>,
 	class Analyze = analyze_1uip<minimise_minisat>,
 	class Send = send_size<4>,
 	class Receive = receive_all,
@@ -118,12 +122,10 @@ public:
 
 	clause_allocator allocate;
 
-	/* A message to/from other threads */
 	struct message {
 		bool empty;
-		std::vector<literal> learnt_literals;
-		std::vector<clause> learnt_clauses;
-		std::vector<unsigned int> detached_clauses;
+
+		typename Propagate::share share;
 
 		message():
 			empty(true)
@@ -134,14 +136,11 @@ public:
 	/* Outgoing messages to other threads; indexed by thread id */
 	message **output;
 
+	/* Incoming message (0 if no incoming message) */
 	std::atomic<message *> channel;
 
-	/* Clauses which have been received from other threads but which
-	 * are not yet attached (because we had to wait for a restart to
-	 * attach them). XXX: This might go away if we figure out a nice
-	 * way to attach clauses on partial backtracks. */
-	std::vector<literal> pending_literals;
-	std::vector<clause> pending_clauses;
+	/* Received (but not yet handled) incoming messages */
+	std::vector<message *> pending_messages;
 
 	Random random;
 	Valuation valuation;
@@ -210,21 +209,25 @@ public:
 		delete[] output;
 	}
 
+	__attribute__ ((warn_unused_result))
 	bool defined(unsigned int var) const
 	{
 		return valuation.defined(*this, var);
 	}
 
+	__attribute__ ((warn_unused_result))
 	bool defined(literal lit) const
 	{
 		return valuation.defined(*this, lit);
 	}
 
+	__attribute__ ((warn_unused_result))
 	bool value(unsigned int var) const
 	{
 		return valuation.value(*this, var);
 	}
 
+	__attribute__ ((warn_unused_result))
 	bool value(literal lit) const
 	{
 		return valuation.value(*this, lit);
@@ -253,17 +256,11 @@ public:
 		plugin.unassign(*this, variable);
 	}
 
-	void attach(literal l)
-	{
-		plugin.attach(*this, l);
-	}
-
 	template<typename ClauseType>
-	bool attach(ClauseType c) /* XXX: __attribute__ ((warn_unused_result)) */
+	__attribute__ ((warn_unused_result))
+	bool attach(ClauseType c)
 	{
 		if (!propagate.attach(*this, c))
-			return false;
-		if (!stack.propagate(*this))
 			return false;
 
 		decide.attach(c);
@@ -274,7 +271,7 @@ public:
 		return true;
 	}
 
-	/* XXX: Fix me. */
+#if 0 /* XXX: Fix me. */
 	void attach_with_watches(clause c, unsigned int i, unsigned int j)
 	{
 		propagate.attach(c, std::make_tuple(c, i, j));
@@ -284,59 +281,56 @@ public:
 		reduce.attach(*this, c);
 		plugin.attach(*this, c);
 	}
+#endif
 
-	void detach(clause c)
+	__attribute__ ((warn_unused_result))
+	bool attach(const std::vector<literal> &c)
 	{
-		propagate.detach(*this, c);
+		bool ok;
+		bool found = propagate.attach(*this, c, ok);
+		assert(found);
+		return ok;
+	}
+
+	/* Attach a vector of literals as a regular disjunctive clause. It will
+	 * search the propagation engines for one that will attach the clause.
+	 * This is most useful for clause learning, which we want to be
+	 * independent of the actual clause types supported by the solver. */
+	__attribute__ ((warn_unused_result))
+	bool attach_learnt(const std::vector<literal> &c)
+	{
+		bool ok;
+		bool found = propagate.attach_learnt(*this, c, ok);
+		assert(found);
+		return ok;
+	}
+
+	template<typename ClauseType>
+	void detach(ClauseType c)
+	{
 		decide.detach(c);
 		send.detach(*this, c);
 		receive.detach(*this, c);
 		reduce.detach(*this, c);
 		plugin.detach(*this, c);
 
-		/* After this, we are not allowed to keep any references to the
-		 * clause. So signal to the owning thread that we no longer hold
-		 * a reference to it. */
-		unsigned int thread = c.thread();
-		unsigned int index = c.index();
-
-		if (thread == id) {
-			/* We _are_ the owning thread. */
-			allocate.free(index);
-		} else {
-			output[thread]->detached_clauses.push_back(index);
-			output[thread]->empty = false;
-		}
+		/* After this, we are not allowed to keep any reference to the
+		 * clause. */
+		propagate.detach(*this, c);
 	}
 
-	void share(literal l)
+	template<typename ClauseType>
+	void share(ClauseType c)
 	{
-		if (!send(*this, l))
-			return;
-
 		for (unsigned int i = 0; i < nr_threads; ++i) {
 			if (i == id)
 				continue;
 
-			output[i]->learnt_literals.push_back(l);
+			/* XXX: It's not certain that the plugin wants to share
+			 * anything at all, in which case we should not set
+			 * ->empty to false. */
 			output[i]->empty = false;
-		}
-	}
-
-	void share(clause c)
-	{
-		/* Always share non-learnt (i.e. non-removable) clauses. */
-		if (c.is_learnt()) {
-			if (!send(*this, c))
-				return;
-		}
-
-		for (unsigned int i = 0; i < nr_threads; ++i) {
-			if (i == id)
-				continue;
-
-			output[i]->learnt_clauses.push_back(c);
-			output[i]->empty = false;
+			output[i]->share.share(*this, c);
 		}
 	}
 
@@ -347,6 +341,7 @@ public:
 		plugin.decision(*this, lit);
 	}
 
+	__attribute__ ((warn_unused_result))
 	bool implication(literal lit, reason_type reason = reason_type())
 	{
 		if (defined(lit)) {
@@ -391,6 +386,7 @@ public:
 		plugin.backtrack(*this, decision);
 	}
 
+	__attribute__ ((warn_unused_result))
 	bool is_redundant(clause c)
 	{
 		/* XXX: Implement a mechanism for signalling the other
@@ -451,6 +447,7 @@ public:
 
 	/* Returns false if and only if we detected unsat. This may happen
 	 * because we received some literals/clauses from other threads. */
+	__attribute__ ((warn_unused_result))
 	bool restart()
 	{
 		stack.backtrack(*this, 0);
@@ -460,21 +457,17 @@ public:
 		plugin.restart(*this);
 		simplify(*this);
 
-		/* XXX: This might change if/when we figure out that we
-		 * want to and can attach clauses at other times than a
-		 * full restart. */
-		for (literal l: pending_literals) {
-			if (!implication(l))
+		for (message *m: pending_messages) {
+			if (!m->share.restart(*this))
 				return false;
-
-			attach(l);
 		}
 
-		pending_literals.clear();
+		/* XXX: Make RAII. */
+		for (message *m: pending_messages)
+			delete m;
 
-		if (!stack.propagate(*this))
-			return false;
-
+		pending_messages.clear();
+#if 0
 		for (clause c: pending_clauses) {
 			if (is_redundant(c)) {
 				unsigned int thread = c.thread();
@@ -482,15 +475,10 @@ public:
 				output[thread]->empty = false;
 				continue;
 			}
-
-			if (!attach(c))
-				return false;
 		}
 
 		pending_clauses.clear();
-
-		if (!stack.propagate(*this))
-			return false;
+#endif
 
 		return true;
 	}
@@ -500,7 +488,7 @@ public:
 		plugin.sat(*this);
 
 		/* Verify that the solution is indeed a solution */
-		for (literal_vector c: original_clauses) {
+		for (const literal_vector &c: original_clauses) {
 			bool v = false;
 			for (literal lit: c) {
 				assert(defined(lit));
@@ -547,56 +535,11 @@ public:
 		printf("s UNSATISFIABLE\n");
 	}
 
-	/* XXX: Find a way to attach literals/clauses without having to modify
-	 * this signature all the time. */
-	void run(const std::vector<literal> &literals,
-		const std::vector<binary_clause> &binary_clauses,
-		const std::vector<clause> &clauses)
+	void run()
 	{
 		debug_thread_id = id;
 
 		plugin.start(*this);
-
-		/* XXX: We currently attach clauses before propagating unit
-		 * literals because we might otherwise try to attach a clause
-		 * that would immediately propagate a value (and we don't
-		 * handle this in attach()). */
-
-		/* Attach all clauses in the original instance */
-		for (clause c: clauses) {
-			if (!attach(c)) {
-				unsat();
-				break;
-			}
-		}
-
-		if (should_exit)
-			return;
-
-		/* Attach all binary clauses in the original instance */
-		for (binary_clause c: binary_clauses) {
-			if (!attach(c)) {
-				unsat();
-				break;
-			}
-		}
-
-		if (should_exit)
-			return;
-
-		/* Queue unit clauses */
-		for (literal l: literals) {
-			if (!implication(l)) {
-				unsat();
-				break;
-			}
-		}
-
-		if (should_exit)
-			return;
-
-		if (!stack.propagate(*this))
-			unsat();
 
 		/* Simplify the instance before doing anything else. */
 		/* XXX: Maybe this should really be a restart? We need to signal
@@ -636,8 +579,7 @@ public:
 			/* Read incoming messages */
 			message *m = channel.exchange(0, std::memory_order_relaxed);
 			if (m) {
-				/* Process message */
-
+#if 0
 				for (literal l: m->learnt_literals) {
 					if (!receive(*this, l))
 						continue;
@@ -664,8 +606,10 @@ public:
 				/* Decrement reference counts for detached clauses */
 				for (unsigned int id: m->detached_clauses)
 					allocate.free(id);
-
-				delete m;
+#else
+				/* XXX: Call m->share.receive() */
+				pending_messages.push_back(m);
+#endif
 			}
 
 			/* This orders our reads from incoming messages with the atomic
@@ -699,6 +643,9 @@ public:
 				}
 
 				backtrack(0);
+
+				/* XXX: The following code needs a lot of attention. It
+				 * should basically mimic the analyze plugin. */
 
 				assert(!conflict_clause.empty());
 				if (conflict_clause.size() == 1) {

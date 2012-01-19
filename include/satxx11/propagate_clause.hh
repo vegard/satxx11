@@ -49,6 +49,60 @@ public:
 	static_assert(propagate_prefetch_watchlist < propagate_prefetch_clause,
 		"propagate_prefetch_watchlist < propagate_prefetch_clause");
 
+	class clause_share {
+	public:
+		std::vector<clause> clauses;
+		std::vector<unsigned int> detached_clauses;
+
+		clause_share()
+		{
+		}
+
+		template<class Solver, class ClauseType>
+		void share(Solver &s, ClauseType c)
+		{
+		}
+
+		template<class Solver>
+		void share(Solver &s, clause c)
+		{
+			clauses.push_back(c);
+		}
+
+		template<class Solver, class ClauseType>
+		void detach(Solver &s, ClauseType c)
+		{
+		}
+
+		template<class Solver>
+		void detach(Solver &s, clause c)
+		{
+				detached_clauses.push_back(c.index());
+		}
+
+		template<class Solver>
+		bool restart(Solver &s)
+		{
+			/* XXX: Do this in a separate receive() function that is
+			 * called immediately when the message is received. There
+			 * is no reason to delay freeing the clause. */
+			for (unsigned int index: detached_clauses)
+				s.allocate.free(index);
+
+			for (clause c: clauses) {
+				if (!s.attach(c))
+					return false;
+
+				if (!s.stack.propagate(s))
+					return false;
+			}
+
+			return true;
+		}
+	};
+
+	typedef clause_share share;
+
 	/* XXX: Maybe put this in its own class using uint8 or something. */
 	watchlist *watchlists;
 
@@ -96,6 +150,7 @@ public:
 		watches[c.thread()][c.index()] = w;
 	}
 
+#if 0
 	template<class Solver>
 	bool attach(Solver &s, std::tuple<clause, unsigned int, unsigned int> c)
 	{
@@ -134,6 +189,7 @@ public:
 
 		assert(false);
 	}
+#endif
 
 	/* Attach a clause that may be in any state (partially or completely
 	 * satisfied or falsified). Returns false if and only if there was a
@@ -216,6 +272,41 @@ public:
 		return false;
 	}
 
+	/* NOTE: Only use this for clauses attached before starting the
+	 * solver threads! */
+	template<class Solver>
+	bool attach(Solver &s, const std::vector<literal> &v, bool &ok)
+	{
+		if (v.size() < 2)
+			return false;
+
+		clause c = s.allocate.allocate(s.nr_threads, s.id, false, v);
+
+		/* Attach clause in all threads */
+		bool all_ok = true;
+		for (unsigned int i = 0; i < s.nr_threads; ++i) {
+			all_ok = all_ok && s.solvers[i]->attach(c) && s.solvers[i]->stack.propagate(s);
+		}
+
+		ok = all_ok;
+		return true;
+	}
+
+	template<class Solver>
+	bool attach_learnt(Solver &s, const std::vector<literal> &v, bool &ok)
+	{
+		if (v.size() < 2)
+			return false;
+
+		clause c = s.allocate.allocate(s.nr_threads, s.id, true, v);
+
+		/* Attach clause in our own thread, but share it with the other
+		 * threads */
+		ok = s.attach(c);
+		s.share(c);
+		return true;
+	}
+
 	template<class Solver, typename ClauseType>
 	void detach(Solver &s, ClauseType c)
 	{
@@ -226,9 +317,23 @@ public:
 	{
 		debug_enter("clause = $", c);
 
-		watch_indices w = watches[c.thread()][c.index()];
+		unsigned int thread = c.thread();
+		unsigned int index = c.index();
+
+		watch_indices w = watches[thread][index];
 		watchlists[~c[w[0]]].remove(c);
 		watchlists[~c[w[1]]].remove(c);
+
+		/* After this, we are not allowed to keep any references to the
+		 * clause. So signal to the owning thread that we no longer hold
+		 * a reference to it. */
+		if (thread == s.id) {
+			/* We _are_ the owning thread. */
+			s.allocate.free(index);
+		} else {
+			s.output[thread]->empty = false;
+			s.output[thread]->share.detach(s, c);
+		}
 	}
 
 	/* Return false if and only if there was a conflict. */

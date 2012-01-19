@@ -24,6 +24,70 @@ namespace satxx11 {
 template<typename... Propagations>
 class propagate_list {
 public:
+	class list_share {
+	public:
+		std::tuple<typename Propagations::share...> shares;
+
+		template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
+		typename std::enable_if<I == sizeof...(Args), void>::type share(Solver &s, ClauseType &c, std::tuple<Args...> &args)
+		{
+		}
+
+		template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
+		typename std::enable_if<I < sizeof...(Args), void>::type share(Solver &s, ClauseType &c, std::tuple<Args...> &args)
+		{
+			std::get<I>(args).share(s, c);
+			share<Solver, ClauseType, I + 1>(s, c, args);
+		}
+
+		template<class Solver, class ClauseType>
+		void share(Solver &s, ClauseType &c)
+		{
+			share(s, c, shares);
+		}
+
+		template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
+		typename std::enable_if<I == sizeof...(Args), void>::type detach(Solver &s, ClauseType &c, std::tuple<Args...> &args)
+		{
+		}
+
+		template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
+		typename std::enable_if<I < sizeof...(Args), void>::type detach(Solver &s, ClauseType &c, std::tuple<Args...> &args)
+		{
+			std::get<I>(args).detach(s, c);
+			detach<Solver, ClauseType, I + 1>(s, c, args);
+		}
+
+		template<class Solver, class ClauseType>
+		void detach(Solver &s, ClauseType &c)
+		{
+			detach(s, c, shares);
+		}
+
+		template<class Solver, unsigned int I = 0, typename... Args>
+		typename std::enable_if<I == sizeof...(Args), bool>::type restart(Solver &s, std::tuple<Args...> &args)
+		{
+			return true;
+		}
+
+		template<class Solver, unsigned int I = 0, typename... Args>
+		typename std::enable_if<I < sizeof...(Args), bool>::type restart(Solver &s, std::tuple<Args...> &args)
+		{
+			if (!std::get<I>(args).restart(s))
+				return false;
+
+			return restart<Solver, I + 1>(s, args);
+		}
+
+		template<class Solver>
+		bool restart(Solver &s)
+		{
+			return restart(s, shares);
+		}
+	};
+
+	typedef list_share share;
+
 	std::tuple<Propagations...> propagations;
 
 	template<class Solver, unsigned int I = 0, typename... Args>
@@ -63,6 +127,48 @@ public:
 	bool attach(Solver &s, ClauseType clause)
 	{
 		return attach(s, clause, propagations);
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), bool>::type attach(Solver &s, const std::vector<literal> &v, bool &ok, std::tuple<Args...> &args)
+	{
+		return false;
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), bool>::type attach(Solver &s, const std::vector<literal> &v, bool &ok, std::tuple<Args...> &args)
+	{
+		if (std::get<I>(args).attach(s, v, ok))
+			return true;
+
+		return attach<Solver, I + 1>(s, v, ok, args);
+	}
+
+	template<class Solver>
+	bool attach(Solver &s, const std::vector<literal> &v, bool &ok)
+	{
+		return attach(s, v, ok, propagations);
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I == sizeof...(Args), bool>::type attach_learnt(Solver &s, const std::vector<literal> &v, bool &ok, std::tuple<Args...> &args)
+	{
+		return false;
+	}
+
+	template<class Solver, unsigned int I = 0, typename... Args>
+	typename std::enable_if<I < sizeof...(Args), bool>::type attach_learnt(Solver &s, const std::vector<literal> &v, bool &ok, std::tuple<Args...> &args)
+	{
+		if (std::get<I>(args).attach_learnt(s, v, ok))
+			return true;
+
+		return attach_learnt<Solver, I + 1>(s, v, ok, args);
+	}
+
+	template<class Solver>
+	bool attach_learnt(Solver &s, const std::vector<literal> &v, bool &ok)
+	{
+		return attach_learnt(s, v, ok, propagations);
 	}
 
 	template<class Solver, class ClauseType, unsigned int I = 0, typename... Args>
