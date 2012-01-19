@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SATXX11_PROPAGATE_BINARY_HH
-#define SATXX11_PROPAGATE_BINARY_HH
+#ifndef SATXX11_PROPAGATE_BINARY_CLAUSE_HH
+#define SATXX11_PROPAGATE_BINARY_CLAUSE_HH
 
 #include <vector>
 
@@ -92,6 +92,6 @@ public:
 	}
 };
 
-};
+}
 
 #endif
