@@ -207,6 +207,7 @@ public:
 			 * must be implied. */
 			/* XXX: implication() assumes the literal may be defined or undefined. From
 			 * this particular callsite it is always undefined, so we could optimize it. */
+			attach(s, c, found_undefined, found_false);
 			return s.implication(c[found_undefined], c);
 		}
 
